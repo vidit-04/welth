@@ -14,23 +14,27 @@
 🔗 [Welth Deployment Link](https://welth-omega.vercel.app/)
 
 ## ✨ Features & Justifications
+
 <p align="center">
-<img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExZzgzdnRudDhpdjJ5MXIxY2QzcGI5Z2MwZzFmMnhvNWhuZzZuZGpueCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/jBOOXxSJfG8kqMxT11/giphy.gif" alt="Ninja Brainstorming" width="400"/>
+  <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExZzgzdnRudDhpdjJ5MXIxY2QzcGI5Z2MwZzFmMnhvNWhuZzZuZGpueCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/jBOOXxSJfG8kqMxT11/giphy.gif" alt="Ninja Brainstorming" width="400"/>
 </p>
-- 🔐 **Google Login & Sign In**: Offers secure, familiar access using Google, improving trust and removing the barrier of password creation.
-- ⚙️ **User Settings Management**: Allows changing preferences, security configurations, and personal details, ensuring flexibility and customization.
-- 🗃️ **PostgreSQL Database**: A robust, scalable relational DB to store transactions, accounts, and user data securely and reliably.
-- ⏱️ **Inngest & Cron Jobs**: Runs automated background tasks for reports, alerts, AI analysis, and threshold checks, keeping users informed and engaged.
-- 📊 **Graphical Monthly Expenditure Overview**: Provides users with visual, actionable insights into their monthly spending patterns to encourage better habits.
-- 📜 **Listed Transactions**: A clear, organized list showing each transaction with filter/search capability to easily find and verify records.
-- 📝 **Edit Transactions**: Enables corrections or updates to existing transactions, ensuring records remain accurate and useful.
-- 📷 **Upload Receipt Image with Gemini AI Extraction**: Users can simply upload a picture of a receipt or bill, and Gemini AI will parse and fill transaction details automatically, reducing manual effort.
-- 👥 **Multiple Accounts Management**: Lets users create multiple accounts (personal, business, family) to manage finances separately and track them effectively.
-- 🔔 **80% Budget Threshold Alerts**: When users reach 80% of their set monthly budget, the system triggers a warning, encouraging mindful spending.
+
+- 🔐 **Google Login & Sign In**: Offers secure, familiar access using Google, improving trust and removing the barrier of password creation.  
+- ⚙️ **User Settings Management**: Allows changing preferences, security configurations, and personal details, ensuring flexibility and customization.  
+- 🗃️ **PostgreSQL Database**: A robust, scalable relational DB to store transactions, accounts, and user data securely and reliably.  
+- ⏱️ **Inngest & Cron Jobs**: Runs automated background tasks for reports, alerts, AI analysis, and threshold checks, keeping users informed and engaged.  
+- 📊 **Graphical Monthly Expenditure Overview**: Provides users with visual, actionable insights into their monthly spending patterns to encourage better habits.  
+- 📜 **Listed Transactions**: A clear, organized list showing each transaction with filter/search capability to easily find and verify records.  
+- 📝 **Edit Transactions**: Enables corrections or updates to existing transactions, ensuring records remain accurate and useful.  
+- 📷 **Upload Receipt Image with Gemini AI Extraction**: Users can simply upload a picture of a receipt or bill, and Gemini AI will parse and fill transaction details automatically, reducing manual effort.  
+- 👥 **Multiple Accounts Management**: Lets users create multiple accounts (personal, business, family) to manage finances separately and track them effectively.  
+- 🔔 **80% Budget Threshold Alerts**: When users reach 80% of their set monthly budget, the system triggers a warning, encouraging mindful spending.  
 - 📧 **Monthly Email Reports with AI Insights**: Every month, Welth emails detailed reports summarizing expenses, savings, and custom AI suggestions on how to improve spending habits and save more.
+
 <p align="center">
-<img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExYjhnbTlqb2pjZTd2dHdxazJ1ZnlocGEwcjR4emRldmc1a3cxZWdlNyZlcD12MV9naWZzX3NlYXJjaCZjdD1n/Ca2QkI07acScyHS7aV/giphy.gif" alt="Duck Coffee" width="400"/>
+  <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExYjhnbTlqb2pjZTd2dHdxazJ1ZnlocGEwcjR4emRldmc1a3cxZWdlNyZlcD12MV9naWZzX3NlYXJjaCZjdD1n/Ca2QkI07acScyHS7aV/giphy.gif" alt="Duck Coffee" width="400"/>
 </p>
+
 ## 🛠️ Tech Stack
 
 | Tech | Role |
