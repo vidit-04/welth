@@ -20,7 +20,7 @@ model User {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
-  @@map("users")
+  @@map("users") // this table will be called "users" in the database
 }
 
 model Account {
@@ -30,13 +30,13 @@ model Account {
   balance      Decimal       @default(0) // will ask inital balance while creating an account
   isDefault    Boolean       @default(false)
   userId       String
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade) // if user is deleted, all accounts will be deleted
   transactions Transaction[]
   budgets      Budget[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
-  @@index([userId])
+  @@index([userId]) // index for faster lookups in user table helps to get accounts faster
   @@map("accounts")
 }
 

@@ -19,7 +19,7 @@ export const transactionSchema = z
     recurringInterval: z
       .enum(["DAILY", "WEEKLY", "MONTHLY", "YEARLY"])
       .optional(),
-  })
+  }) //If recurring & interval is not provided then it is an error
   .superRefine((data, ctx) => {
     if (data.isRecurring && !data.recurringInterval) {
       ctx.addIssue({
