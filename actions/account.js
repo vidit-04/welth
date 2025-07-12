@@ -67,12 +67,12 @@ export async function bulkDeleteTransactions(transactionIds) {
       },
     });
 
+    console.log("Found transactions to delete:", transactions.length);
+
     // Group transactions by account to update balances
     const accountBalanceChanges = transactions.reduce((acc, transaction) => {
-      const change =
-        transaction.type === "EXPENSE"
-          ? transaction.amount
-          : -transaction.amount;
+      const amount = transaction.amount.toNumber(); // Convert Decimal to number
+      const change = transaction.type === "EXPENSE" ? amount : -amount;
       acc[transaction.accountId] = (acc[transaction.accountId] || 0) + change;
       return acc;
     }, {});
@@ -80,12 +80,14 @@ export async function bulkDeleteTransactions(transactionIds) {
     // Delete transactions and update account balances in a transaction
     await db.$transaction(async (tx) => {
       // Delete transactions
-      await tx.transaction.deleteMany({
+      const deletedCount = await tx.transaction.deleteMany({
         where: {
           id: { in: transactionIds },
           userId: user.id,
         },
       });
+
+      console.log("Deleted transactions:", deletedCount.count);
 
       // Update account balances
       for (const [accountId, balanceChange] of Object.entries(
@@ -107,6 +109,7 @@ export async function bulkDeleteTransactions(transactionIds) {
 
     return { success: true };
   } catch (error) {
+    console.error("Bulk delete error:", error);
     return { success: false, error: error.message };
   }
 }

@@ -181,6 +181,7 @@ export function TransactionTable({ transactions }) {
   useEffect(() => {
     if (deleted && !deleteLoading) {
       toast.error("Transactions deleted successfully");
+      setSelectedIds([]); // Clear selections after delete
     }
   }, [deleted, deleteLoading]);
 
