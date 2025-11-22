@@ -7,8 +7,6 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import aj from "@/lib/arcjet";
 import { request } from "@arcjet/next";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
 const serializeAmount = (obj) => ({
   ...obj,
   amount: obj.amount.toNumber(),
@@ -230,63 +228,161 @@ export async function getUserTransactions(query = {}) {
 // Scan Receipt
 export async function scanReceipt(file) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const apiKey = process.env.GEMINI_API_KEY?.trim();
+    
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY is not configured. Please add it to your .env file and restart the dev server.");
+    }
+
+    // Validate file
+    if (!file) {
+      throw new Error("No file provided");
+    }
+
+    // Validate file type
+    if (!file.type || !file.type.startsWith("image/")) {
+      throw new Error("Please upload a valid image file (JPEG, PNG, etc.)");
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    
+    // Model names to try in order - using latest available models
+    // These models are available with your API key (verified via ListModels)
+    const modelsToTry = [
+      "gemini-2.5-flash",  // Latest flash model (fast and efficient)
+      "gemini-flash-latest",  // Latest stable flash
+      "gemini-2.5-pro",  // Latest pro model (more capable)
+      "gemini-pro-latest"  // Latest stable pro
+    ];
 
     // Convert File to ArrayBuffer
-    const arrayBuffer = await file.arrayBuffer();
+    let arrayBuffer;
+    try {
+      arrayBuffer = await file.arrayBuffer();
+      if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+        throw new Error("File is empty or corrupted");
+      }
+    } catch (error) {
+      console.error("Error reading file:", error);
+      throw new Error("Failed to read the image file. Please try again with a different image.");
+    }
+
     // Convert ArrayBuffer to Base64
     const base64String = Buffer.from(arrayBuffer).toString("base64");
 
     const prompt = `
-      Analyze this receipt image and extract the following information in JSON format:
-      - Total amount (just the number)
-      - Date (in ISO format)
-      - Description or items purchased (brief summary)
-      - Merchant/store name
-      - Suggested category (one of: housing,transportation,groceries,utilities,entertainment,food,shopping,healthcare,education,personal,travel,insurance,gifts,bills,other-expense )
+      Analyze this receipt or invoice image and extract the following information in JSON format:
+      - Total amount (just the number, from TOTAL field if it's an invoice)
+      - Date (in ISO format YYYY-MM-DD, from invoice date or receipt date)
+      - Description or items purchased (brief summary of items)
+      - Merchant/store name (company name from FROM field or merchant name)
+      - Suggested category (one of: housing,transportation,groceries,utilities,entertainment,food,shopping,healthcare,education,personal,travel,insurance,gifts,bills,other-expense)
       
       Only respond with valid JSON in this exact format:
       {
         "amount": number,
-        "date": "ISO date string",
+        "date": "ISO date string (YYYY-MM-DD)",
         "description": "string",
         "merchantName": "string",
         "category": "string"
       }
 
-      If its not a recipt, return an empty object
+      For the invoice shown:
+      - Extract the TOTAL amount (e.g., 154.06)
+      - Extract the invoice date
+      - Use merchant/store name from FROM section
+      - Describe items from the line items
+      - Choose appropriate category based on items
+
+      If it's not a receipt or invoice, return an empty object {}
     `;
 
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          data: base64String,
-          mimeType: file.type,
-        },
-      },
-      prompt,
-    ]);
+    // Try different models until one works
+    let result;
+    let lastError;
+
+    for (const modelName of modelsToTry) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        
+        result = await model.generateContent([
+          {
+            inlineData: {
+              data: base64String,
+              mimeType: file.type || "image/jpeg",
+            },
+          },
+          prompt,
+        ]);
+        
+        break; // Success! Exit the loop
+      } catch (error) {
+        lastError = error;
+        // Continue to next model
+      }
+    }
+
+    // If all models failed, throw a helpful error
+    if (!result) {
+      const errorMsg = lastError?.message || "Unknown error";
+      throw new Error(
+        `All Gemini models failed. Last error: ${errorMsg}. ` +
+        `Tried: ${modelsToTry.join(", ")}. ` +
+        `Please check your API key has access to vision models at https://aistudio.google.com/apikey`
+      );
+    }
 
     const response = await result.response;
     const text = response.text();
     const cleanedText = text.replace(/```(?:json)?\n?/g, "").trim();
 
+    // Handle empty response or invalid receipt
+    if (!cleanedText || cleanedText === "{}" || cleanedText === "") {
+      throw new Error("Unable to extract receipt information. Please ensure the image contains a valid receipt.");
+    }
+
     try {
       const data = JSON.parse(cleanedText);
+      
+      // Validate extracted data
+      if (!data.amount || !data.category) {
+        throw new Error("Receipt data incomplete. Please try again with a clearer image.");
+      }
+
       return {
         amount: parseFloat(data.amount),
-        date: new Date(data.date),
-        description: data.description,
+        date: data.date ? new Date(data.date) : new Date(),
+        description: data.description || "",
         category: data.category,
-        merchantName: data.merchantName,
+        merchantName: data.merchantName || "",
       };
     } catch (parseError) {
       console.error("Error parsing JSON response:", parseError);
-      throw new Error("Invalid response format from Gemini");
+      console.error("Response text:", cleanedText);
+      throw new Error(`Invalid response format from Gemini AI. ${parseError.message}`);
     }
   } catch (error) {
-    console.error("Error scanning receipt:", error);
-    throw new Error("Failed to scan receipt");
+    // Provide more specific error messages
+    if (error.message.includes("API key") || error.message.includes("401")) {
+      throw new Error("Gemini API key is invalid or missing. Please check your GEMINI_API_KEY in .env file.");
+    }
+    
+    if (error.message.includes("404") || error.message.includes("not found") || error.message.includes("models/")) {
+      throw new Error(
+        "Model not found. The Gemini model may not be available in your region or API version. " +
+        "Please check your API key has access to vision models."
+      );
+    }
+    
+    if (error.message.includes("quota") || error.message.includes("limit") || error.message.includes("429")) {
+      throw new Error("Gemini API quota exceeded. Please check your API usage limits.");
+    }
+    
+    if (error.message.includes("permission") || error.message.includes("403")) {
+      throw new Error("Permission denied. Please check your Gemini API key permissions.");
+    }
+    
+    throw new Error(error.message || "Failed to scan receipt. Please try again.");
   }
 }
 
