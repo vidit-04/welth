@@ -2,12 +2,18 @@ import React from "react";
 import { Button } from "./ui/button";
 import { PenBox, LayoutDashboard } from "lucide-react";
 import Link from "next/link";
-import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
+import { SignInButton, UserButton } from "@clerk/nextjs";
+import { auth } from "@clerk/nextjs/server";
 import { checkUser } from "@/lib/checkUser";
 import Image from "next/image";
 
 const Header = async () => {
-  await checkUser();
+  const { userId } = await auth();
+  const isSignedIn = Boolean(userId);
+
+  if (isSignedIn) {
+    await checkUser();
+  }
 
   return (
     <header className="fixed top-0 w-full bg-white/80 backdrop-blur-md z-50 border-b">
@@ -24,7 +30,8 @@ const Header = async () => {
 
         {/* Navigation Links - Different for signed in/out users */}
         <div className="hidden md:flex items-center space-x-8">
-          <SignedOut>
+          {!isSignedIn && (
+            <>
             <a href="#features" className="text-gray-600 hover:text-blue-600">
               Features
             </a>
@@ -34,12 +41,14 @@ const Header = async () => {
             >
               Testimonials
             </a>
-          </SignedOut>
+            </>
+          )}
         </div>
 
         {/* Action Buttons */}
         <div className="flex items-center space-x-4">
-          <SignedIn>
+          {isSignedIn && (
+            <>
             <Link
               href="/dashboard"
               className="text-gray-600 hover:text-blue-600 flex items-center gap-2"
@@ -55,13 +64,14 @@ const Header = async () => {
                 <span className="hidden md:inline">Add Transaction</span>
               </Button>
             </a>
-          </SignedIn>
-          <SignedOut>
+            </>
+          )}
+          {!isSignedIn && (
             <SignInButton forceRedirectUrl="/dashboard">
               <Button variant="outline">Login</Button>
             </SignInButton>
-          </SignedOut>
-          <SignedIn>
+          )}
+          {isSignedIn && (
             <UserButton
               appearance={{
                 elements: {
@@ -69,7 +79,7 @@ const Header = async () => {
                 },
               }}
             />
-          </SignedIn>
+          )}
         </div>
       </nav>
     </header>
