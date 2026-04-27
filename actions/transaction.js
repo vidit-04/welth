@@ -12,6 +12,72 @@ const serializeAmount = (obj) => ({
   amount: obj.amount.toNumber(),
 });
 
+const GEMINI_RECEIPT_MODELS = [
+  "gemini-3.1-flash-lite",
+  "gemini-3-flash",
+  "gemini-2.5-flash",
+];
+
+const RECEIPT_CATEGORIES = new Set([
+  "housing",
+  "transportation",
+  "groceries",
+  "utilities",
+  "entertainment",
+  "food",
+  "shopping",
+  "healthcare",
+  "education",
+  "personal",
+  "travel",
+  "insurance",
+  "gifts",
+  "bills",
+  "other-expense",
+]);
+
+function extractJsonFromText(text) {
+  const cleanedText = text.replace(/```(?:json)?\n?/gi, "").trim();
+  const start = cleanedText.indexOf("{");
+  const end = cleanedText.lastIndexOf("}");
+
+  if (start === -1 || end === -1 || end <= start) {
+    throw new Error("No JSON object found in AI response.");
+  }
+
+  return cleanedText.slice(start, end + 1);
+}
+
+function normalizeReceiptData(parsed) {
+  const amount = Number(parsed?.amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Receipt amount could not be extracted accurately.");
+  }
+
+  const rawCategory =
+    typeof parsed?.category === "string"
+      ? parsed.category.toLowerCase().trim()
+      : "other-expense";
+  const category = RECEIPT_CATEGORIES.has(rawCategory)
+    ? rawCategory
+    : "other-expense";
+
+  const parsedDate =
+    parsed?.date && !Number.isNaN(new Date(parsed.date).getTime())
+      ? new Date(parsed.date)
+      : new Date();
+
+  return {
+    amount,
+    date: parsedDate,
+    description:
+      typeof parsed?.description === "string" ? parsed.description.trim() : "",
+    category,
+    merchantName:
+      typeof parsed?.merchantName === "string" ? parsed.merchantName.trim() : "",
+  };
+}
+
 // Create Transaction
 export async function createTransaction(data) {
   try {
@@ -246,15 +312,6 @@ export async function scanReceipt(file) {
 
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    // Model names to try in order - using latest available models
-    // These models are available with your API key (verified via ListModels)
-    const modelsToTry = [
-      "gemini-2.5-flash",  // Latest flash model (fast and efficient)
-      "gemini-flash-latest",  // Latest stable flash
-      "gemini-2.5-pro",  // Latest pro model (more capable)
-      "gemini-pro-latest"  // Latest stable pro
-    ];
-
     // Convert File to ArrayBuffer
     let arrayBuffer;
     try {
@@ -301,9 +358,14 @@ export async function scanReceipt(file) {
     let result;
     let lastError;
 
-    for (const modelName of modelsToTry) {
+    for (const modelName of GEMINI_RECEIPT_MODELS) {
       try {
-        const model = genAI.getGenerativeModel({ model: modelName });
+        const model = genAI.getGenerativeModel({
+          model: modelName,
+          generationConfig: {
+            responseMimeType: "application/json",
+          },
+        });
         
         result = await model.generateContent([
           {
@@ -327,38 +389,26 @@ export async function scanReceipt(file) {
       const errorMsg = lastError?.message || "Unknown error";
       throw new Error(
         `All Gemini models failed. Last error: ${errorMsg}. ` +
-        `Tried: ${modelsToTry.join(", ")}. ` +
+        `Tried: ${GEMINI_RECEIPT_MODELS.join(", ")}. ` +
         `Please check your API key has access to vision models at https://aistudio.google.com/apikey`
       );
     }
 
     const response = await result.response;
     const text = response.text();
-    const cleanedText = text.replace(/```(?:json)?\n?/g, "").trim();
+    const extractedJsonText = extractJsonFromText(text);
 
     // Handle empty response or invalid receipt
-    if (!cleanedText || cleanedText === "{}" || cleanedText === "") {
+    if (!extractedJsonText || extractedJsonText === "{}") {
       throw new Error("Unable to extract receipt information. Please ensure the image contains a valid receipt.");
     }
 
     try {
-      const data = JSON.parse(cleanedText);
-      
-      // Validate extracted data
-      if (!data.amount || !data.category) {
-        throw new Error("Receipt data incomplete. Please try again with a clearer image.");
-      }
-
-      return {
-        amount: parseFloat(data.amount),
-        date: data.date ? new Date(data.date) : new Date(),
-        description: data.description || "",
-        category: data.category,
-        merchantName: data.merchantName || "",
-      };
+      const data = JSON.parse(extractedJsonText);
+      return normalizeReceiptData(data);
     } catch (parseError) {
       console.error("Error parsing JSON response:", parseError);
-      console.error("Response text:", cleanedText);
+      console.error("Response text:", extractedJsonText);
       throw new Error(`Invalid response format from Gemini AI. ${parseError.message}`);
     }
   } catch (error) {

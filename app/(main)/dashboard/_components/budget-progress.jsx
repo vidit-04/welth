@@ -65,43 +65,47 @@ export function BudgetProgress({ initialBudget, currentExpenses, accountId, acco
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <div className="flex-1">
+      <CardHeader className="pb-2">
+        <div className="flex-1 space-y-2">
           <CardTitle className="text-sm font-medium">
             Monthly Budget ({accountName})
           </CardTitle>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             {isEditing ? (
-              <div className="flex items-center gap-2">
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
                 <Input
                   type="number"
                   value={newBudget}
                   onChange={(e) => setNewBudget(e.target.value)}
-                  className="w-32"
+                  className="w-full sm:w-40"
                   placeholder="Enter amount"
                   autoFocus
                   disabled={isLoading}
                 />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleUpdateBudget}
-                  disabled={isLoading}
-                >
-                  <Check className="h-4 w-4 text-green-500" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleCancel}
-                  disabled={isLoading}
-                >
-                  <X className="h-4 w-4 text-red-500" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleUpdateBudget}
+                    disabled={isLoading}
+                    aria-label="Save budget"
+                  >
+                    <Check className="h-4 w-4 text-green-500" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleCancel}
+                    disabled={isLoading}
+                    aria-label="Cancel editing budget"
+                  >
+                    <X className="h-4 w-4 text-red-500" />
+                  </Button>
+                </div>
               </div>
             ) : (
               <>
-                <CardDescription>
+                <CardDescription className="break-words">
                   {initialBudget
                     ? `₹${currentExpenses.toFixed(
                         2
@@ -113,6 +117,7 @@ export function BudgetProgress({ initialBudget, currentExpenses, accountId, acco
                   size="icon"
                   onClick={() => setIsEditing(true)}
                   className="h-6 w-6"
+                  aria-label="Edit budget"
                 >
                   <Pencil className="h-3 w-3" />
                 </Button>

@@ -15,9 +15,11 @@ export default async function AddTransactionPage({ searchParams }) {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-5">
-      <div className="flex justify-center md:justify-normal mb-8">
-        <h1 className="text-5xl gradient-title ">Add Transaction</h1>
+    <div className="mx-auto max-w-3xl px-1 pb-4 sm:px-2">
+      <div className="mb-6 flex justify-center md:justify-normal sm:mb-8">
+        <h1 className="text-center text-3xl font-bold leading-tight gradient-title sm:text-5xl md:text-left">
+          {editId ? "Edit Transaction" : "Add Transaction"}
+        </h1>
       </div>
       <AddTransactionForm
         accounts={accounts}

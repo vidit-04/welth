@@ -77,10 +77,10 @@ export function DashboardOverview({ accounts, transactions }) {
   );
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
       {/* Recent Transactions Card */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+      <Card className="min-w-0 overflow-hidden">
+        <CardHeader className="flex flex-col gap-3 pb-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
           <CardTitle className="text-base font-normal">
             Recent Transactions
           </CardTitle>
@@ -88,7 +88,7 @@ export function DashboardOverview({ accounts, transactions }) {
             value={selectedAccountId}
             onValueChange={setSelectedAccountId}
           >
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Select account" />
             </SelectTrigger>
             <SelectContent>
@@ -110,20 +110,20 @@ export function DashboardOverview({ accounts, transactions }) {
               recentTransactions.map((transaction) => (
                 <div
                   key={transaction.id}
-                  className="flex items-center justify-between"
+                  className="flex items-start justify-between gap-3"
                 >
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium leading-none">
+                  <div className="min-w-0 space-y-1">
+                    <p className="truncate text-sm font-medium leading-none sm:whitespace-normal">
                       {transaction.description || "Untitled Transaction"}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {format(new Date(transaction.date), "PP")}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="shrink-0">
                     <div
                       className={cn(
-                        "flex items-center",
+                        "flex items-center text-sm sm:text-base",
                         transaction.type === "EXPENSE"
                           ? "text-red-500"
                           : "text-green-500"
@@ -145,29 +145,29 @@ export function DashboardOverview({ accounts, transactions }) {
       </Card>
 
       {/* Expense Breakdown Card */}
-      <Card>
+      <Card className="min-w-0 overflow-hidden">
         <CardHeader>
           <CardTitle className="text-base font-normal">
             Monthly Expense Breakdown
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-0 pb-5">
+        <CardContent className="overflow-hidden p-0 pb-5">
           {pieChartData.length === 0 ? (
             <p className="text-center text-muted-foreground py-4">
               No expenses this month
             </p>
           ) : (
-            <div className="h-[300px]">
+            <div className="h-[260px] sm:h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={pieChartData}
                     cx="50%"
                     cy="50%"
-                    outerRadius={80}
+                    outerRadius={72}
                     fill="#8884d8"
                     dataKey="value"
-                    label={({ name, value }) => `${name}: ₹${value.toFixed(2)}`}
+                    label={false}
                   >
                     {pieChartData.map((entry, index) => (
                       <Cell
@@ -184,7 +184,7 @@ export function DashboardOverview({ accounts, transactions }) {
                       borderRadius: "var(--radius)",
                     }}
                   />
-                  <Legend />
+                  <Legend wrapperStyle={{ fontSize: "11px" }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>

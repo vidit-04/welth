@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import { getUserAccounts } from "@/actions/dashboard";
 import { getDashboardData } from "@/actions/dashboard";
 import { getCurrentBudget } from "@/actions/budget";
@@ -24,7 +23,7 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 pb-4 sm:space-y-8">
       {/* Budget Progress */}
       {defaultAccount && (
         <BudgetProgress
@@ -42,10 +41,10 @@ export default async function DashboardPage() {
       />
 
       {/* Accounts Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <CreateAccountDrawer>
-          <Card className="hover:shadow-md transition-shadow cursor-pointer border-dashed">
-            <CardContent className="flex flex-col items-center justify-center text-muted-foreground h-full pt-5">
+          <Card className="cursor-pointer border-dashed transition-shadow hover:shadow-md">
+            <CardContent className="flex h-full min-h-32 flex-col items-center justify-center px-4 py-6 text-center text-muted-foreground">
               <Plus className="h-10 w-10 mb-2" />
               <p className="text-sm font-medium">Add New Account</p>
             </CardContent>

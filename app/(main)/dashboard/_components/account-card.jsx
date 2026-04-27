@@ -1,8 +1,7 @@
 "use client";
 
-import { ArrowUpRight, ArrowDownRight, CreditCard } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
 import { useEffect } from "react";
 import useFetch from "@/hooks/use-fetch";
 import {
@@ -50,10 +49,10 @@ export function AccountCard({ account }) {
   }, [error]);
 
   return (
-    <Card className="hover:shadow-md transition-shadow group relative">
+    <Card className="group relative transition-shadow hover:shadow-md">
       <Link href={`/account/${id}`}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium capitalize">
+          <CardTitle className="line-clamp-1 pr-3 text-sm font-medium capitalize">
             {name}
           </CardTitle>
           <Switch
@@ -62,15 +61,15 @@ export function AccountCard({ account }) {
             disabled={updateDefaultLoading}
           />
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">
+        <CardContent className="pb-4">
+          <div className="break-words text-xl font-bold sm:text-2xl">
             ₹{parseFloat(balance).toFixed(2)}
           </div>
           <p className="text-xs text-muted-foreground">
             {type.charAt(0) + type.slice(1).toLowerCase()} Account
           </p>
         </CardContent>
-        <CardFooter className="flex justify-between text-sm text-muted-foreground">
+        <CardFooter className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground sm:text-sm">
           <div className="flex items-center">
             <ArrowUpRight className="mr-1 h-4 w-4 text-green-500" />
             Income

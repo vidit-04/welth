@@ -46,22 +46,27 @@ export function AccountChart({ transactions }) {
 
     // Group transactions by date
     const grouped = filtered.reduce((acc, transaction) => {
-      const date = format(new Date(transaction.date), "MMM dd");
-      if (!acc[date]) {
-        acc[date] = { date, income: 0, expense: 0 };
+      const transactionDate = startOfDay(new Date(transaction.date));
+      const dateKey = format(transactionDate, "yyyy-MM-dd");
+
+      if (!acc[dateKey]) {
+        acc[dateKey] = {
+          date: dateKey,
+          label: format(transactionDate, "MMM dd"),
+          income: 0,
+          expense: 0,
+        };
       }
       if (transaction.type === "INCOME") {
-        acc[date].income += transaction.amount;
+        acc[dateKey].income += transaction.amount;
       } else {
-        acc[date].expense += transaction.amount;
+        acc[dateKey].expense += transaction.amount;
       }
       return acc;
     }, {});
 
     // Convert to array and sort by date
-    return Object.values(grouped).sort(
-      (a, b) => new Date(a.date) - new Date(b.date)
-    );
+    return Object.values(grouped).sort((a, b) => a.date.localeCompare(b.date));
   }, [transactions, dateRange]);
 
   // Calculate totals for the selected period
@@ -77,12 +82,12 @@ export function AccountChart({ transactions }) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
+      <CardHeader className="space-y-3 pb-5 sm:pb-7">
         <CardTitle className="text-base font-normal">
           Transaction Overview
         </CardTitle>
-        <Select defaultValue={dateRange} onValueChange={setDateRange}>
-          <SelectTrigger className="w-[140px]">
+        <Select value={dateRange} onValueChange={setDateRange}>
+          <SelectTrigger className="w-full sm:w-[170px]">
             <SelectValue placeholder="Select range" />
           </SelectTrigger>
           <SelectContent>
@@ -95,7 +100,7 @@ export function AccountChart({ transactions }) {
         </Select>
       </CardHeader>
       <CardContent>
-        <div className="flex justify-around mb-6 text-sm">
+        <div className="mb-6 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
           <div className="text-center">
             <p className="text-muted-foreground">Total Income</p>
             <p className="text-lg font-bold text-green-500">
@@ -121,49 +126,64 @@ export function AccountChart({ transactions }) {
             </p>
           </div>
         </div>
-        <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={filteredData}
-              margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis
-                dataKey="date"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => `₹${value}`}
-              />
-              <Tooltip
-                formatter={(value) => [`₹${value}`, undefined]}
-                contentStyle={{
-                  backgroundColor: "hsl(var(--popover))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "var(--radius)",
-                }}
-              />
-              <Legend />
-              <Bar
-                dataKey="income"
-                name="Income"
-                fill="#22c55e"
-                radius={[4, 4, 0, 0]}
-              />
-              <Bar
-                dataKey="expense"
-                name="Expense"
-                fill="#ef4444"
-                radius={[4, 4, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        {filteredData.length === 0 ? (
+          <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+            No transactions found in the selected date range.
+          </div>
+        ) : (
+          <div className="h-[260px] sm:h-[320px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={filteredData}
+                margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis
+                  dataKey="label"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                  minTickGap={18}
+                  interval="preserveStartEnd"
+                />
+                <YAxis
+                  width={52}
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(value) => {
+                    if (value >= 1000) {
+                      return `₹${(value / 1000).toFixed(1)}k`;
+                    }
+                    return `₹${value}`;
+                  }}
+                />
+                <Tooltip
+                  labelFormatter={(_, payload) => payload?.[0]?.payload?.label}
+                  formatter={(value) => [`₹${Number(value).toFixed(2)}`, undefined]}
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--popover))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "var(--radius)",
+                  }}
+                />
+                <Legend />
+                <Bar
+                  dataKey="income"
+                  name="Income"
+                  fill="#22c55e"
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar
+                  dataKey="expense"
+                  name="Expense"
+                  fill="#ef4444"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
