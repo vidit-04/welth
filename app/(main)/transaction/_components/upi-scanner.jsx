@@ -7,7 +7,6 @@ import {
   Camera,
   Copy,
   Check,
-  Loader2,
   Smartphone,
   X,
 } from "lucide-react";
@@ -16,46 +15,6 @@ import { toast } from "sonner";
 import jsQR from "jsqr";
 import { QRCodeSVG } from "qrcode.react";
 
-// ── UPI app registry ──────────────────────────────────────────────────────────
-const UPI_APPS = [
-  {
-    id: "gpay",
-    name: "Google Pay",
-    initials: "G",
-    bg: "bg-blue-500",
-    text: "text-white",
-    ring: "ring-blue-500",
-    getUrl: (query) => `tez://upi/pay?${query}`,
-  },
-  {
-    id: "phonepe",
-    name: "PhonePe",
-    initials: "P",
-    bg: "bg-purple-600",
-    text: "text-white",
-    ring: "ring-purple-600",
-    getUrl: (query) => `phonepe://pay?${query}`,
-  },
-  {
-    id: "supermoney",
-    name: "SuperMoney",
-    initials: "SM",
-    bg: "bg-orange-500",
-    text: "text-white",
-    ring: "ring-orange-500",
-    getUrl: (query) => `supermoney://pay?${query}`,
-  },
-  {
-    id: "generic",
-    name: "Any UPI App",
-    initials: "···",
-    bg: "bg-gray-200 dark:bg-gray-700",
-    text: "text-gray-700 dark:text-gray-200",
-    ring: "ring-gray-400",
-    getUrl: (_, originalUrl) => originalUrl,
-  },
-];
-
 function parseUpiUrl(url) {
   if (!url.startsWith("upi://pay")) return null;
   const queryStart = url.indexOf("?");
@@ -63,7 +22,6 @@ function parseUpiUrl(url) {
   const params = new URLSearchParams(query);
   return {
     upiUrl: url,
-    upiQuery: query,
     pa: params.get("pa") || "",
     pn: decodeURIComponent(params.get("pn") || ""),
     am: params.get("am") || "",
@@ -71,24 +29,10 @@ function parseUpiUrl(url) {
   };
 }
 
-function buildAppUrl(app, upiQuery, originalUrl) {
-  if (app.id === "generic") return originalUrl;
-  return app.getUrl(upiQuery);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-export function UpiScanner({
-  onUpiScanned,
-  upiData,
-  onPayAndSave,
-  isLoading,
-  onReset,
-}) {
+export function UpiScanner({ onUpiScanned, upiData, onReset }) {
   const [isScanning, setIsScanning] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [selectedAppId, setSelectedAppId] = useState("generic");
 
   const fileInputRef = useRef(null);
   const videoRef = useRef(null);
@@ -96,13 +40,11 @@ export function UpiScanner({
   const streamRef = useRef(null);
 
   useEffect(() => {
-    const mobile =
+    setIsMobile(
       /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
         navigator.userAgent
-      ) || window.innerWidth < 768;
-    setIsMobile(mobile);
-    // Default to generic on desktop, gpay on mobile
-    if (mobile) setSelectedAppId("gpay");
+      ) || window.innerWidth < 768
+    );
     return () => stopCamera();
   }, []);
 
@@ -210,57 +152,48 @@ export function UpiScanner({
     toast.success("UPI link copied");
   }
 
-  function handlePayClick() {
-    const app = UPI_APPS.find((a) => a.id === selectedAppId) ?? UPI_APPS[3];
-    const url = buildAppUrl(app, upiData.upiQuery, upiData.upiUrl);
-    onPayAndSave(url);
-  }
-
   // ── Post-scan UI ──────────────────────────────────────────────────────────
   if (upiData) {
     const merchantLabel = upiData.pn || upiData.pa || "Unknown Merchant";
 
-    // Shared merchant header used by both layouts
-    const MerchantHeader = (
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="h-9 w-9 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center shrink-0">
-            <QrCode className="h-4 w-4 text-purple-600" />
+    // Merchant info card — same for mobile and desktop.
+    // Desktop also shows a QR so the user can scan on phone.
+    return (
+      <div className="rounded-xl border border-purple-200 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-800 p-4 space-y-3">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-9 w-9 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center shrink-0">
+              <QrCode className="h-4 w-4 text-purple-600" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">Paying to</p>
+              <p className="font-semibold leading-tight truncate">{merchantLabel}</p>
+              {upiData.pa && (
+                <p className="text-xs text-muted-foreground truncate">{upiData.pa}</p>
+              )}
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="text-xs text-muted-foreground">Paying to</p>
-            <p className="font-semibold leading-tight truncate">{merchantLabel}</p>
-            {upiData.pa && (
-              <p className="text-xs text-muted-foreground truncate">{upiData.pa}</p>
-            )}
-          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0 text-muted-foreground"
+            onClick={onReset}
+          >
+            <X className="h-4 w-4" />
+          </Button>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 shrink-0 text-muted-foreground"
-          onClick={onReset}
-          title="Remove UPI scan"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
-    );
 
-    // ── Desktop layout: QR bridge + copy link, no app picker, no CTA ────────
-    if (!isMobile) {
-      return (
-        <div className="rounded-xl border border-purple-200 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-800 p-4 space-y-3">
-          {MerchantHeader}
-
-          <div className="flex flex-col items-center gap-3 py-1">
+        {/* Desktop only: QR to scan on phone + copy link */}
+        {!isMobile && (
+          <div className="flex flex-col items-center gap-3 pt-1">
             <p className="text-sm text-muted-foreground flex items-center gap-1.5">
               <Smartphone className="h-4 w-4" />
-              Scan with your phone to complete payment
+              Scan with your phone to pay
             </p>
             <div className="bg-white p-3 rounded-xl shadow-sm inline-block">
-              <QRCodeSVG value={upiData.upiUrl} size={164} />
+              <QRCodeSVG value={upiData.upiUrl} size={160} />
             </div>
             <Button
               type="button"
@@ -269,71 +202,15 @@ export function UpiScanner({
               className="h-8 text-xs"
               onClick={copyLink}
             >
-              {copied ? (
-                <><Check className="h-3 w-3 mr-1.5" />Copied!</>
-              ) : (
-                <><Copy className="h-3 w-3 mr-1.5" />Copy UPI Link</>
-              )}
+              {copied
+                ? <><Check className="h-3 w-3 mr-1.5" />Copied!</>
+                : <><Copy className="h-3 w-3 mr-1.5" />Copy UPI Link</>}
             </Button>
+            <p className="text-xs text-muted-foreground">
+              Fill the form and click <strong>Create Transaction</strong> below
+            </p>
           </div>
-
-          <p className="text-xs text-center text-muted-foreground pb-1">
-            {upiData.am
-              ? "Amount auto-filled · "
-              : ""}
-            Select category and click <strong>Create Transaction</strong> below
-          </p>
-        </div>
-      );
-    }
-
-    // ── Mobile layout: app picker + Pay & Save CTA ───────────────────────────
-    return (
-      <div className="rounded-xl border border-purple-200 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-800 p-4 space-y-4">
-        {MerchantHeader}
-
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">Pay with</p>
-          <div className="grid grid-cols-4 gap-2">
-            {UPI_APPS.map((app) => {
-              const isSelected = selectedAppId === app.id;
-              return (
-                <button
-                  key={app.id}
-                  type="button"
-                  onClick={() => setSelectedAppId(app.id)}
-                  className={`flex flex-col items-center gap-1.5 p-2 rounded-lg border-2 transition-all ${
-                    isSelected
-                      ? "border-purple-500 bg-white dark:bg-purple-900/30"
-                      : "border-transparent hover:border-muted hover:bg-white/60 dark:hover:bg-white/5"
-                  }`}
-                >
-                  <div
-                    className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-xs ${app.bg} ${app.text}`}
-                  >
-                    {app.initials}
-                  </div>
-                  <span className="text-[10px] text-center leading-tight text-muted-foreground">
-                    {app.name}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <Button
-          type="button"
-          className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium"
-          onClick={handlePayClick}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</>
-          ) : (
-            `Pay via ${UPI_APPS.find((a) => a.id === selectedAppId)?.name ?? "UPI"}`
-          )}
-        </Button>
+        )}
       </div>
     );
   }

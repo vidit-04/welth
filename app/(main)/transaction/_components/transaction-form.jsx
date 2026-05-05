@@ -143,45 +143,56 @@ export function AddTransactionForm({
     }
   };
 
-  // Called by the scanner with the app-specific URL chosen by the user
-  const handleUpiPayAndSave = (appUrl) => {
-    upiRedirectUrlRef.current = appUrl || upiData?.upiUrl;
+  const handleUpiPayAndSave = () => {
+    upiRedirectUrlRef.current = upiData?.upiUrl ?? null;
     handleSubmit((data) => {
-      const formData = { ...data, amount: parseFloat(data.amount) };
-      transactionFn(formData);
+      transactionFn({ ...data, amount: parseFloat(data.amount) });
     })();
   };
 
   useEffect(() => {
     if (transactionResult?.success && !transactionLoading) {
       toast.success(
-        editMode
-          ? "Transaction updated successfully"
-          : "Transaction created successfully"
+        editMode ? "Transaction updated successfully" : "Transaction created successfully"
       );
       reset();
+
       const redirectUrl = upiRedirectUrlRef.current;
-      if (redirectUrl) {
-        const isMobile =
-          /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-            navigator.userAgent
-          );
-        if (isMobile) {
-          window.location.href = redirectUrl;
-          return;
-        }
+      const accountPath = `/account/${transactionResult.data.accountId}`;
+
+      if (redirectUrl && isMobileDevice) {
+        let navigated = false;
+        const finish = () => {
+          if (!navigated) {
+            navigated = true;
+            router.push(accountPath);
+          }
+        };
+        // When user comes back from the UPI app
+        const onVisibility = () => {
+          if (!document.hidden) {
+            document.removeEventListener("visibilitychange", onVisibility);
+            finish();
+          }
+        };
+        document.addEventListener("visibilitychange", onVisibility);
+        // Fallback if UPI scheme fails (app not installed)
+        setTimeout(finish, 1500);
+        window.location.href = redirectUrl;
+        return;
       }
-      router.push(`/account/${transactionResult.data.accountId}`);
+
+      router.push(accountPath);
     }
-  }, [transactionResult, transactionLoading, editMode, reset, router]);
+  }, [transactionResult, transactionLoading, editMode, reset, router, isMobileDevice]);
 
   const type = watch("type");
   const isRecurring = watch("isRecurring");
   const date = watch("date");
+  const amount = watch("amount");
 
-  const filteredCategories = categories.filter(
-    (category) => category.type === type
-  );
+  const filteredCategories = categories.filter((c) => c.type === type);
+  const canPayUpi = !!amount && parseFloat(amount) > 0;
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="min-w-0 space-y-6 overflow-x-hidden">
@@ -192,8 +203,6 @@ export function AddTransactionForm({
           <UpiScanner
             onUpiScanned={handleUpiScanned}
             upiData={upiData}
-            onPayAndSave={handleUpiPayAndSave}
-            isLoading={transactionLoading}
             onReset={() => setUpiData(null)}
           />
         </div>
@@ -374,9 +383,36 @@ export function AddTransactionForm({
         </div>
       )}
 
-      {/* On mobile+UPI mode the scanner card has its own CTA — hide these.
-          On desktop always show so the user can submit normally. */}
-      {(!upiData || !isMobileDevice) && (
+      {upiData && isMobileDevice ? (
+        /* UPI mode — purple gradient box replaces normal buttons */
+        <div className="rounded-xl border border-purple-200 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-800 p-4">
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => router.back()}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold"
+              onClick={handleUpiPayAndSave}
+              disabled={transactionLoading || !canPayUpi}
+            >
+              {transactionLoading ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</>
+              ) : !canPayUpi ? (
+                "Enter amount first"
+              ) : (
+                "Pay with UPI"
+              )}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        /* Normal mode */
         <div className="flex gap-4">
           <Button
             type="button"
