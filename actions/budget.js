@@ -25,12 +25,16 @@ export async function getCurrentBudget(accountId) {
       },
     });
 
-    // Get current month's expenses for the specific account
+    // Get current month's expenses for the specific account.
+    // startOfMonth is pulled back 6 h from UTC midnight so that transactions
+    // created on the 1st in IST (UTC+5:30, stored as ~18:30 UTC prev day)
+    // are still included. Safe because calendar-picked dates are always at
+    // local midnight, so the prev-month's last day is ~18:30 UTC, well before
+    // the 18:00 UTC boundary.
     const currentDate = new Date();
     const startOfMonth = new Date(
-      currentDate.getFullYear(),
-      currentDate.getMonth(),
-      1
+      Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth(), 1) -
+        6 * 60 * 60 * 1000
     );
     const endOfMonth = new Date(
       currentDate.getFullYear(),

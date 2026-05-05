@@ -32,6 +32,13 @@ import { transactionSchema } from "@/app/lib/schema";
 import { ReceiptScanner } from "./recipt-scanner";
 import { UpiScanner } from "./upi-scanner";
 
+// Normalise a JS Date to UTC midnight so the stored value is always
+// "YYYY-MM-DDT00:00:00.000Z" regardless of the user's timezone.
+// Without this, picking "May 1" in IST writes April 30 18:30 UTC to the DB,
+// which falls outside a server-side UTC startOfMonth query.
+const toUtcDate = (d) =>
+  new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+
 export function AddTransactionForm({
   accounts,
   categories,
@@ -72,7 +79,7 @@ export function AddTransactionForm({
             description: initialData.description,
             accountId: initialData.accountId,
             category: initialData.category,
-            date: new Date(initialData.date),
+            date: toUtcDate(new Date(initialData.date)),
             isRecurring: initialData.isRecurring,
             ...(initialData.recurringInterval && {
               recurringInterval: initialData.recurringInterval,
@@ -84,7 +91,7 @@ export function AddTransactionForm({
             description: "",
             accountId: accounts.find((ac) => ac.isDefault)?.id,
             category: "",
-            date: new Date(),
+            date: toUtcDate(new Date()),
             isRecurring: false,
           },
   });
@@ -136,7 +143,7 @@ export function AddTransactionForm({
       setValue("category", "");
       setTimeout(() => categoryTriggerRef.current?.focus(), 100);
     }
-    setValue("date", new Date());
+    setValue("date", toUtcDate(new Date()));
     // Description intentionally NOT auto-filled — user may have pre-typed it
     if (data.am) {
       setValue("amount", data.am);
@@ -336,7 +343,7 @@ export function AddTransactionForm({
             <Calendar
               mode="single"
               selected={date}
-              onSelect={(date) => setValue("date", date)}
+              onSelect={(date) => date && setValue("date", toUtcDate(date))}
               disabled={(date) =>
                 date > new Date() || date < new Date("1900-01-01")
               }
