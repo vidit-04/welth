@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CalendarIcon, Loader2 } from "lucide-react";
@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { createTransaction, updateTransaction } from "@/actions/transaction";
 import { transactionSchema } from "@/app/lib/schema";
 import { ReceiptScanner } from "./recipt-scanner";
+import { UpiScanner } from "./upi-scanner";
 
 export function AddTransactionForm({
   accounts,
@@ -40,6 +41,18 @@ export function AddTransactionForm({
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");
+
+  const [upiData, setUpiData] = useState(null);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const categoryTriggerRef = useRef(null);
+
+  useEffect(() => {
+    setIsMobileDevice(
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent
+      ) || window.innerWidth < 768
+    );
+  }, []);
 
   const {
     register,
@@ -109,6 +122,36 @@ export function AddTransactionForm({
     }
   };
 
+  // Stores the selected app's redirect URL — kept in a ref so it doesn't
+  // trigger the useEffect dependency array when updated.
+  const upiRedirectUrlRef = useRef(null);
+
+  const handleUpiScanned = (data) => {
+    setUpiData(data);
+    const currentType = getValues("type");
+    setValue("type", "EXPENSE");
+    // Only clear category if the type was INCOME — its categories don't apply to EXPENSE.
+    // If the user already picked an EXPENSE category, keep it.
+    if (currentType !== "EXPENSE") {
+      setValue("category", "");
+      setTimeout(() => categoryTriggerRef.current?.focus(), 100);
+    }
+    setValue("date", new Date());
+    // Description intentionally NOT auto-filled — user may have pre-typed it
+    if (data.am) {
+      setValue("amount", data.am);
+    }
+  };
+
+  // Called by the scanner with the app-specific URL chosen by the user
+  const handleUpiPayAndSave = (appUrl) => {
+    upiRedirectUrlRef.current = appUrl || upiData?.upiUrl;
+    handleSubmit((data) => {
+      const formData = { ...data, amount: parseFloat(data.amount) };
+      transactionFn(formData);
+    })();
+  };
+
   useEffect(() => {
     if (transactionResult?.success && !transactionLoading) {
       toast.success(
@@ -117,6 +160,17 @@ export function AddTransactionForm({
           : "Transaction created successfully"
       );
       reset();
+      const redirectUrl = upiRedirectUrlRef.current;
+      if (redirectUrl) {
+        const isMobile =
+          /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+            navigator.userAgent
+          );
+        if (isMobile) {
+          window.location.href = redirectUrl;
+          return;
+        }
+      }
       router.push(`/account/${transactionResult.data.accountId}`);
     }
   }, [transactionResult, transactionLoading, editMode, reset, router]);
@@ -131,8 +185,19 @@ export function AddTransactionForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="min-w-0 space-y-6 overflow-x-hidden">
-      {/* Receipt Scanner - Only show in create mode */}
-      {!editMode && <ReceiptScanner onScanComplete={handleScanComplete} />}
+      {/* Scanners - Only show in create mode */}
+      {!editMode && (
+        <div className="space-y-2">
+          <ReceiptScanner onScanComplete={handleScanComplete} />
+          <UpiScanner
+            onUpiScanned={handleUpiScanned}
+            upiData={upiData}
+            onPayAndSave={handleUpiPayAndSave}
+            isLoading={transactionLoading}
+            onReset={() => setUpiData(null)}
+          />
+        </div>
+      )}
 
       {/* Type */}
       <div className="space-y-2">
@@ -210,7 +275,7 @@ export function AddTransactionForm({
           onValueChange={(value) => setValue("category", value)}
           value={watch("category")}
         >
-          <SelectTrigger>
+          <SelectTrigger ref={categoryTriggerRef}>
             <SelectValue placeholder="Select category" />
           </SelectTrigger>
           <SelectContent>
@@ -309,29 +374,32 @@ export function AddTransactionForm({
         </div>
       )}
 
-      {/* Actions */}
-      <div className="flex gap-4">
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full"
-          onClick={() => router.back()}
-        >
-          Cancel
-        </Button>
-        <Button type="submit" className="w-full" disabled={transactionLoading}>
-          {transactionLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              {editMode ? "Updating..." : "Creating..."}
-            </>
-          ) : editMode ? (
-            "Update Transaction"
-          ) : (
-            "Create Transaction"
-          )}
-        </Button>
-      </div>
+      {/* On mobile+UPI mode the scanner card has its own CTA — hide these.
+          On desktop always show so the user can submit normally. */}
+      {(!upiData || !isMobileDevice) && (
+        <div className="flex gap-4">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={() => router.back()}
+          >
+            Cancel
+          </Button>
+          <Button type="submit" className="w-full" disabled={transactionLoading}>
+            {transactionLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {editMode ? "Updating..." : "Creating..."}
+              </>
+            ) : editMode ? (
+              "Update Transaction"
+            ) : (
+              "Create Transaction"
+            )}
+          </Button>
+        </div>
+      )}
     </form>
   );
 }
