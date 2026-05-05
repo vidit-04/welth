@@ -236,15 +236,23 @@ export async function updateTransaction(id, data) {
         },
       });
 
-      // Update account balance
-      await tx.account.update({
-        where: { id: data.accountId },
-        data: {
-          balance: {
-            increment: netBalanceChange,
-          },
-        },
-      });
+      // Update account balance(s)
+      if (data.accountId !== originalTransaction.accountId) {
+        // Account changed: reverse old account, apply new to new account
+        await tx.account.update({
+          where: { id: originalTransaction.accountId },
+          data: { balance: { increment: -oldBalanceChange } },
+        });
+        await tx.account.update({
+          where: { id: data.accountId },
+          data: { balance: { increment: newBalanceChange } },
+        });
+      } else {
+        await tx.account.update({
+          where: { id: data.accountId },
+          data: { balance: { increment: netBalanceChange } },
+        });
+      }
 
       return updated;
     });

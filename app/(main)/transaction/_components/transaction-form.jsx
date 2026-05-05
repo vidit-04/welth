@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CalendarIcon, Loader2 } from "lucide-react";
@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { createTransaction, updateTransaction } from "@/actions/transaction";
 import { transactionSchema } from "@/app/lib/schema";
 import { ReceiptScanner } from "./recipt-scanner";
+import { UpiScanner } from "./upi-scanner";
 
 export function AddTransactionForm({
   accounts,
@@ -40,6 +41,18 @@ export function AddTransactionForm({
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");
+
+  const [upiData, setUpiData] = useState(null);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const categoryTriggerRef = useRef(null);
+
+  useEffect(() => {
+    setIsMobileDevice(
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent
+      ) || window.innerWidth < 768
+    );
+  }, []);
 
   const {
     register,
@@ -70,6 +83,7 @@ export function AddTransactionForm({
             amount: "",
             description: "",
             accountId: accounts.find((ac) => ac.isDefault)?.id,
+            category: "",
             date: new Date(),
             isRecurring: false,
           },
@@ -108,36 +122,116 @@ export function AddTransactionForm({
     }
   };
 
+  // Stores the selected app's redirect URL — kept in a ref so it doesn't
+  // trigger the useEffect dependency array when updated.
+  const upiRedirectUrlRef = useRef(null);
+
+  const handleUpiScanned = (data) => {
+    setUpiData(data);
+    const currentType = getValues("type");
+    setValue("type", "EXPENSE");
+    // Only clear category if the type was INCOME — its categories don't apply to EXPENSE.
+    // If the user already picked an EXPENSE category, keep it.
+    if (currentType !== "EXPENSE") {
+      setValue("category", "");
+      setTimeout(() => categoryTriggerRef.current?.focus(), 100);
+    }
+    setValue("date", new Date());
+    // Description intentionally NOT auto-filled — user may have pre-typed it
+    if (data.am) {
+      setValue("amount", data.am);
+    }
+  };
+
+  const handleUpiPayAndSave = () => {
+    if (!upiData?.upiUrl) return;
+
+    // Rebuild the UPI URL with the form's current amount so the UPI app
+    // always opens with the correct pre-filled amount — whether or not the
+    // original QR had one.
+    const qIndex = upiData.upiUrl.indexOf("?");
+    const base = upiData.upiUrl.slice(0, qIndex);
+    const params = new URLSearchParams(
+      qIndex !== -1 ? upiData.upiUrl.slice(qIndex + 1) : ""
+    );
+    const formAmount = getValues("amount");
+    if (formAmount) {
+      params.set("am", parseFloat(formAmount).toFixed(2));
+      if (!params.get("cu")) params.set("cu", "INR");
+    }
+    upiRedirectUrlRef.current = `${base}?${params.toString()}`;
+
+    handleSubmit((data) => {
+      transactionFn({ ...data, amount: parseFloat(data.amount) });
+    })();
+  };
+
   useEffect(() => {
     if (transactionResult?.success && !transactionLoading) {
       toast.success(
-        editMode
-          ? "Transaction updated successfully"
-          : "Transaction created successfully"
+        editMode ? "Transaction updated successfully" : "Transaction created successfully"
       );
       reset();
-      router.push(`/account/${transactionResult.data.accountId}`);
+
+      const redirectUrl = upiRedirectUrlRef.current;
+      const accountPath = `/account/${transactionResult.data.accountId}`;
+
+      if (redirectUrl && isMobileDevice) {
+        let navigated = false;
+        const finish = () => {
+          if (!navigated) {
+            navigated = true;
+            router.push(accountPath);
+          }
+        };
+        // When user comes back from the UPI app
+        const onVisibility = () => {
+          if (!document.hidden) {
+            document.removeEventListener("visibilitychange", onVisibility);
+            finish();
+          }
+        };
+        document.addEventListener("visibilitychange", onVisibility);
+        // Fallback if UPI scheme fails (app not installed)
+        setTimeout(finish, 1500);
+        window.location.href = redirectUrl;
+        return;
+      }
+
+      router.push(accountPath);
     }
-  }, [transactionResult, transactionLoading, editMode, reset, router]);
+  }, [transactionResult, transactionLoading, editMode, reset, router, isMobileDevice]);
 
   const type = watch("type");
   const isRecurring = watch("isRecurring");
   const date = watch("date");
+  const amount = watch("amount");
 
-  const filteredCategories = categories.filter(
-    (category) => category.type === type
-  );
+  const filteredCategories = categories.filter((c) => c.type === type);
+  const canPayUpi = !!amount && parseFloat(amount) > 0;
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="min-w-0 space-y-6 overflow-x-hidden">
-      {/* Receipt Scanner - Only show in create mode */}
-      {!editMode && <ReceiptScanner onScanComplete={handleScanComplete} />}
+      {/* Scanners - Only show in create mode */}
+      {!editMode && (
+        <div className="space-y-2">
+          <ReceiptScanner onScanComplete={handleScanComplete} />
+          <UpiScanner
+            onUpiScanned={handleUpiScanned}
+            upiData={upiData}
+            onReset={() => setUpiData(null)}
+          />
+        </div>
+      )}
 
       {/* Type */}
       <div className="space-y-2">
         <label className="text-sm font-medium">Type</label>
         <Select
-          onValueChange={(value) => setValue("type", value)}
+          onValueChange={(value) => {
+            setValue("type", value);
+            setValue("category", "");
+          }}
           defaultValue={type}
         >
           <SelectTrigger>
@@ -204,9 +298,9 @@ export function AddTransactionForm({
         <label className="text-sm font-medium">Category</label>
         <Select
           onValueChange={(value) => setValue("category", value)}
-          defaultValue={getValues("category")}
+          value={watch("category")}
         >
-          <SelectTrigger>
+          <SelectTrigger ref={categoryTriggerRef}>
             <SelectValue placeholder="Select category" />
           </SelectTrigger>
           <SelectContent>
@@ -305,29 +399,59 @@ export function AddTransactionForm({
         </div>
       )}
 
-      {/* Actions */}
-      <div className="flex gap-4">
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full"
-          onClick={() => router.back()}
-        >
-          Cancel
-        </Button>
-        <Button type="submit" className="w-full" disabled={transactionLoading}>
-          {transactionLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              {editMode ? "Updating..." : "Creating..."}
-            </>
-          ) : editMode ? (
-            "Update Transaction"
-          ) : (
-            "Create Transaction"
-          )}
-        </Button>
-      </div>
+      {upiData && isMobileDevice ? (
+        /* UPI mode — purple gradient box replaces normal buttons */
+        <div className="rounded-xl border border-purple-200 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-800 p-4">
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => router.back()}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold"
+              onClick={handleUpiPayAndSave}
+              disabled={transactionLoading || !canPayUpi}
+            >
+              {transactionLoading ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</>
+              ) : !canPayUpi ? (
+                "Enter amount first"
+              ) : (
+                "Pay with UPI"
+              )}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        /* Normal mode */
+        <div className="flex gap-4">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={() => router.back()}
+          >
+            Cancel
+          </Button>
+          <Button type="submit" className="w-full" disabled={transactionLoading}>
+            {transactionLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {editMode ? "Updating..." : "Creating..."}
+              </>
+            ) : editMode ? (
+              "Update Transaction"
+            ) : (
+              "Create Transaction"
+            )}
+          </Button>
+        </div>
+      )}
     </form>
   );
 }
