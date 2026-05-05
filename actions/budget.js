@@ -35,7 +35,11 @@ export async function getCurrentBudget(accountId) {
     const endOfMonth = new Date(
       currentDate.getFullYear(),
       currentDate.getMonth() + 1,
-      0
+      0,
+      23,
+      59,
+      59,
+      999
     );
 
     const expenses = await db.transaction.aggregate({

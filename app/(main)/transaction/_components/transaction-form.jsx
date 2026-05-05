@@ -70,6 +70,7 @@ export function AddTransactionForm({
             amount: "",
             description: "",
             accountId: accounts.find((ac) => ac.isDefault)?.id,
+            category: "",
             date: new Date(),
             isRecurring: false,
           },
@@ -137,7 +138,10 @@ export function AddTransactionForm({
       <div className="space-y-2">
         <label className="text-sm font-medium">Type</label>
         <Select
-          onValueChange={(value) => setValue("type", value)}
+          onValueChange={(value) => {
+            setValue("type", value);
+            setValue("category", "");
+          }}
           defaultValue={type}
         >
           <SelectTrigger>
@@ -204,7 +208,7 @@ export function AddTransactionForm({
         <label className="text-sm font-medium">Category</label>
         <Select
           onValueChange={(value) => setValue("category", value)}
-          defaultValue={getValues("category")}
+          value={watch("category")}
         >
           <SelectTrigger>
             <SelectValue placeholder="Select category" />

@@ -30,9 +30,10 @@ export function BudgetProgress({ initialBudget, currentExpenses, accountId, acco
     error,
   } = useFetch(updateBudget);
 
-  const percentUsed = initialBudget
-    ? (currentExpenses / initialBudget.amount) * 100
-    : 0;
+  const percentUsed =
+    initialBudget && initialBudget.amount > 0
+      ? (currentExpenses / initialBudget.amount) * 100
+      : 0;
 
   const handleUpdateBudget = async () => {
     const amount = parseFloat(newBudget);
@@ -130,7 +131,7 @@ export function BudgetProgress({ initialBudget, currentExpenses, accountId, acco
         {initialBudget && (
           <div className="space-y-2">
             <Progress
-              value={percentUsed}
+              value={Math.min(percentUsed, 100)}
               extraStyles={`${
                 // add to Progress component
                 percentUsed >= 90
