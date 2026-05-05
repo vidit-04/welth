@@ -144,7 +144,23 @@ export function AddTransactionForm({
   };
 
   const handleUpiPayAndSave = () => {
-    upiRedirectUrlRef.current = upiData?.upiUrl ?? null;
+    if (!upiData?.upiUrl) return;
+
+    // Rebuild the UPI URL with the form's current amount so the UPI app
+    // always opens with the correct pre-filled amount — whether or not the
+    // original QR had one.
+    const qIndex = upiData.upiUrl.indexOf("?");
+    const base = upiData.upiUrl.slice(0, qIndex);
+    const params = new URLSearchParams(
+      qIndex !== -1 ? upiData.upiUrl.slice(qIndex + 1) : ""
+    );
+    const formAmount = getValues("amount");
+    if (formAmount) {
+      params.set("am", parseFloat(formAmount).toFixed(2));
+      if (!params.get("cu")) params.set("cu", "INR");
+    }
+    upiRedirectUrlRef.current = `${base}?${params.toString()}`;
+
     handleSubmit((data) => {
       transactionFn({ ...data, amount: parseFloat(data.amount) });
     })();
