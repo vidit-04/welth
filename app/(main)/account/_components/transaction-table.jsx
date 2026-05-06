@@ -109,6 +109,9 @@ export function TransactionTable({ transactions }) {
       switch (sortConfig.field) {
         case "date":
           comparison = new Date(a.date) - new Date(b.date);
+          if (comparison === 0) {
+            comparison = new Date(a.createdAt) - new Date(b.createdAt);
+          }
           break;
         case "amount":
           comparison = a.amount - b.amount;
