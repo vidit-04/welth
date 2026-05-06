@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import aj from "@/lib/arcjet";
 import { request } from "@arcjet/next";
-import { recalculateAccountBalance } from "@/lib/balance";
+import { recalculateBalancesFromDate } from "@/lib/balance";
 
 const serializeAmount = (obj) => ({
   ...obj,
@@ -143,7 +143,7 @@ export async function createTransaction(data) {
         },
       });
 
-      await recalculateAccountBalance(data.accountId, tx);
+      await recalculateBalancesFromDate(data.accountId, data.date, tx);
 
       return newTransaction;
     });
@@ -216,9 +216,13 @@ export async function updateTransaction(id, data) {
         },
       });
 
-      await recalculateAccountBalance(data.accountId, tx);
+      // Use the earlier of the two dates so the window covers both old and new position
+      const fromDate = new Date(
+        Math.min(new Date(originalTransaction.date).getTime(), new Date(data.date).getTime())
+      );
+      await recalculateBalancesFromDate(data.accountId, fromDate, tx);
       if (data.accountId !== originalTransaction.accountId) {
-        await recalculateAccountBalance(originalTransaction.accountId, tx);
+        await recalculateBalancesFromDate(originalTransaction.accountId, new Date(originalTransaction.date), tx);
       }
 
       return updated;
