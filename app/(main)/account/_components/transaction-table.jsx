@@ -109,6 +109,9 @@ export function TransactionTable({ transactions }) {
       switch (sortConfig.field) {
         case "date":
           comparison = new Date(a.date) - new Date(b.date);
+          if (comparison === 0) {
+            comparison = new Date(a.createdAt) - new Date(b.createdAt);
+          }
           break;
         case "amount":
           comparison = a.amount - b.amount;
@@ -456,6 +459,7 @@ export function TransactionTable({ transactions }) {
                     ))}
                 </div>
               </TableHead>
+              <TableHead className="text-right">Balance</TableHead>
               <TableHead>Recurring</TableHead>
               <TableHead className="w-[50px]" />
             </TableRow>
@@ -464,7 +468,7 @@ export function TransactionTable({ transactions }) {
             {paginatedTransactions.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={8}
                   className="text-center text-muted-foreground"
                 >
                   No transactions found
@@ -501,6 +505,11 @@ export function TransactionTable({ transactions }) {
                   >
                     {transaction.type === "EXPENSE" ? "-" : "+"}₹
                     {Number(transaction.amount).toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-right font-medium text-muted-foreground">
+                    {transaction.balanceAfter != null
+                      ? `₹${Number(transaction.balanceAfter).toFixed(2)}`
+                      : "—"}
                   </TableCell>
                   <TableCell>
                     {transaction.isRecurring ? (

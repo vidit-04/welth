@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import aj from "@/lib/arcjet";
 import { request } from "@arcjet/next";
+import { recalculateBalancesFromDate } from "@/lib/balance";
 
 const serializeAmount = (obj) => ({
   ...obj,
@@ -129,11 +130,7 @@ export async function createTransaction(data) {
       throw new Error("Account not found");
     }
 
-    // Calculate new balance
-    const balanceChange = data.type === "EXPENSE" ? -data.amount : data.amount;
-    const newBalance = account.balance.toNumber() + balanceChange;
-
-    // Create transaction and update account balance
+    // Create transaction then recalculate balance from source of truth
     const transaction = await db.$transaction(async (tx) => {
       const newTransaction = await tx.transaction.create({
         data: {
@@ -146,10 +143,7 @@ export async function createTransaction(data) {
         },
       });
 
-      await tx.account.update({
-        where: { id: data.accountId },
-        data: { balance: newBalance },
-      });
+      await recalculateBalancesFromDate(data.accountId, data.date, tx);
 
       return newTransaction;
     });
@@ -209,24 +203,10 @@ export async function updateTransaction(id, data) {
 
     if (!originalTransaction) throw new Error("Transaction not found");
 
-    // Calculate balance changes
-    const oldBalanceChange =
-      originalTransaction.type === "EXPENSE"
-        ? -originalTransaction.amount.toNumber()
-        : originalTransaction.amount.toNumber();
-
-    const newBalanceChange =
-      data.type === "EXPENSE" ? -data.amount : data.amount;
-
-    const netBalanceChange = newBalanceChange - oldBalanceChange;
-
-    // Update transaction and account balance in a transaction
+    // Update transaction then recalculate balance(s) from source of truth
     const transaction = await db.$transaction(async (tx) => {
       const updated = await tx.transaction.update({
-        where: {
-          id,
-          userId: user.id,
-        },
+        where: { id, userId: user.id },
         data: {
           ...data,
           nextRecurringDate:
@@ -236,22 +216,13 @@ export async function updateTransaction(id, data) {
         },
       });
 
-      // Update account balance(s)
+      // Use the earlier of the two dates so the window covers both old and new position
+      const fromDate = new Date(
+        Math.min(new Date(originalTransaction.date).getTime(), new Date(data.date).getTime())
+      );
+      await recalculateBalancesFromDate(data.accountId, fromDate, tx);
       if (data.accountId !== originalTransaction.accountId) {
-        // Account changed: reverse old account, apply new to new account
-        await tx.account.update({
-          where: { id: originalTransaction.accountId },
-          data: { balance: { increment: -oldBalanceChange } },
-        });
-        await tx.account.update({
-          where: { id: data.accountId },
-          data: { balance: { increment: newBalanceChange } },
-        });
-      } else {
-        await tx.account.update({
-          where: { id: data.accountId },
-          data: { balance: { increment: netBalanceChange } },
-        });
+        await recalculateBalancesFromDate(originalTransaction.accountId, new Date(originalTransaction.date), tx);
       }
 
       return updated;

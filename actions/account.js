@@ -3,15 +3,14 @@
 import { db } from "@/lib/prisma";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { recalculateBalancesFromDate } from "@/lib/balance";
 
 const serializeDecimal = (obj) => {
   const serialized = { ...obj };
-  if (obj.balance) {
-    serialized.balance = obj.balance.toNumber();
-  }
-  if (obj.amount) {
-    serialized.amount = obj.amount.toNumber();
-  }
+  if (obj.balance != null) serialized.balance = obj.balance?.toNumber?.() ?? obj.balance;
+  if (obj.initialBalance != null) serialized.initialBalance = obj.initialBalance?.toNumber?.() ?? obj.initialBalance;
+  if (obj.amount != null) serialized.amount = obj.amount?.toNumber?.() ?? obj.amount;
+  if (obj.balanceAfter != null) serialized.balanceAfter = obj.balanceAfter?.toNumber?.() ?? obj.balanceAfter;
   return serialized;
 };
 
@@ -32,7 +31,7 @@ export async function getAccountWithTransactions(accountId) {
     },
     include: {
       transactions: {
-        orderBy: { date: "desc" },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
       },
       _count: {
         select: { transactions: true },
@@ -69,38 +68,21 @@ export async function bulkDeleteTransactions(transactionIds) {
 
     console.log("Found transactions to delete:", transactions.length);
 
-    // Group transactions by account to update balances
-    const accountBalanceChanges = transactions.reduce((acc, transaction) => {
-      const amount = transaction.amount.toNumber(); // Convert Decimal to number
-      const change = transaction.type === "EXPENSE" ? amount : -amount;
-      acc[transaction.accountId] = (acc[transaction.accountId] || 0) + change;
+    // Group by account, find earliest affected date per account
+    const accountFromDates = transactions.reduce((acc, t) => {
+      const d = new Date(t.date);
+      if (!acc[t.accountId] || d < acc[t.accountId]) acc[t.accountId] = d;
       return acc;
     }, {});
 
-    // Delete transactions and update account balances in a transaction
+    // Delete then recalculate only from the earliest affected date forward
     await db.$transaction(async (tx) => {
-      // Delete transactions
-      const deletedCount = await tx.transaction.deleteMany({
-        where: {
-          id: { in: transactionIds },
-          userId: user.id,
-        },
+      await tx.transaction.deleteMany({
+        where: { id: { in: transactionIds }, userId: user.id },
       });
 
-      console.log("Deleted transactions:", deletedCount.count);
-
-      // Update account balances
-      for (const [accountId, balanceChange] of Object.entries(
-        accountBalanceChanges
-      )) {
-        await tx.account.update({
-          where: { id: accountId },
-          data: {
-            balance: {
-              increment: balanceChange,
-            },
-          },
-        });
+      for (const [accountId, fromDate] of Object.entries(accountFromDates)) {
+        await recalculateBalancesFromDate(accountId, fromDate, tx);
       }
     });
 

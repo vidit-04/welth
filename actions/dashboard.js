@@ -8,12 +8,9 @@ import { revalidatePath } from "next/cache";
 
 const serializeTransaction = (obj) => {
   const serialized = { ...obj };
-  if (obj.balance) {
-    serialized.balance = obj.balance.toNumber();
-  }
-  if (obj.amount) {
-    serialized.amount = obj.amount.toNumber();
-  }
+  if (obj.balance != null) serialized.balance = obj.balance?.toNumber?.() ?? obj.balance;
+  if (obj.initialBalance != null) serialized.initialBalance = obj.initialBalance?.toNumber?.() ?? obj.initialBalance;
+  if (obj.amount != null) serialized.amount = obj.amount?.toNumber?.() ?? obj.amount;
   return serialized;
 };
 
@@ -114,13 +111,15 @@ export async function createAccount(data) {
       });
     }
 
-    // Create new account
+    // Create new account — store initialBalance separately so balance
+    // can always be recalculated from scratch via recalculateAccountBalance().
     const account = await db.account.create({
       data: {
         ...data,
         balance: balanceFloat,
+        initialBalance: balanceFloat,
         userId: user.id,
-        isDefault: shouldBeDefault, // Override the isDefault based on our logic
+        isDefault: shouldBeDefault,
       },
     });
 
