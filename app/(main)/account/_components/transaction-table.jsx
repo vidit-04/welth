@@ -504,7 +504,9 @@ export function TransactionTable({ transactions }) {
                     {Number(transaction.amount).toFixed(2)}
                   </TableCell>
                   <TableCell className="text-right font-medium text-muted-foreground">
-                    ₹{Number(transaction.balanceAfter).toFixed(2)}
+                    {transaction.balanceAfter != null
+                      ? `₹${Number(transaction.balanceAfter).toFixed(2)}`
+                      : "—"}
                   </TableCell>
                   <TableCell>
                     {transaction.isRecurring ? (
