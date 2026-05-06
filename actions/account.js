@@ -7,9 +7,9 @@ import { recalculateAccountBalance } from "@/lib/balance";
 
 const serializeDecimal = (obj) => {
   const serialized = { ...obj };
-  if (obj.balance) serialized.balance = obj.balance.toNumber();
-  if (obj.initialBalance) serialized.initialBalance = obj.initialBalance.toNumber();
-  if (obj.amount) serialized.amount = obj.amount.toNumber();
+  if (obj.balance != null) serialized.balance = obj.balance?.toNumber?.() ?? obj.balance;
+  if (obj.initialBalance != null) serialized.initialBalance = obj.initialBalance?.toNumber?.() ?? obj.initialBalance;
+  if (obj.amount != null) serialized.amount = obj.amount?.toNumber?.() ?? obj.amount;
   return serialized;
 };
 
