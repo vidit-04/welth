@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CalendarIcon, Loader2 } from "lucide-react";
+import { CalendarIcon, Loader2, ScanLine } from "lucide-react";
 import { format } from "date-fns";
 import { useRouter, useSearchParams } from "next/navigation";
 import useFetch from "@/hooks/use-fetch";
@@ -31,6 +31,7 @@ import { createTransaction, updateTransaction } from "@/actions/transaction";
 import { transactionSchema } from "@/app/lib/schema";
 import { ReceiptScanner } from "./recipt-scanner";
 import { UpiScanner } from "./upi-scanner";
+import { QRCodeSVG } from "qrcode.react";
 
 // Normalise a JS Date to UTC midnight so the stored value is always
 // "YYYY-MM-DDT00:00:00.000Z" regardless of the user's timezone.
@@ -244,6 +245,7 @@ export function AddTransactionForm({
             onUpiScanned={handleUpiScanned}
             upiData={upiData}
             onReset={() => setUpiData(null)}
+            upiLinkWithAmount={upiDirectLink}
           />
         </div>
       )}
@@ -424,8 +426,40 @@ export function AddTransactionForm({
       )}
 
       {upiData && isMobileDevice ? (
-        /* UPI mode — purple box replaces normal buttons */
-        <div className="rounded-xl border border-purple-200 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-800 p-4 space-y-3">
+        /* UPI mode — QR-first layout */
+        <div className="rounded-xl border border-purple-200 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-800 p-4 space-y-4">
+
+          {/* QR-first: scan this with your UPI app — no redirect, 100% reliable */}
+          <div className="flex flex-col items-center gap-2">
+            <div className="flex items-center gap-1.5 text-sm font-medium text-purple-700 dark:text-purple-300">
+              <ScanLine className="h-4 w-4" />
+              Scan with your UPI app
+            </div>
+
+            {upiDirectLink ? (
+              <>
+                <div className="bg-white p-3 rounded-xl shadow-sm">
+                  <QRCodeSVG value={upiDirectLink} size={180} />
+                </div>
+                <p className="text-[11px] text-muted-foreground text-center">
+                  Open UPI app → Scan QR → Enter PIN
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground py-2">
+                Enter amount above to generate QR
+              </p>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+            <div className="flex-1 border-t border-purple-200 dark:border-purple-700" />
+            or try direct redirect
+            <div className="flex-1 border-t border-purple-200 dark:border-purple-700" />
+          </div>
+
+          {/* Fallback: JS redirect + save transaction */}
           <div className="flex gap-3">
             <Button
               type="button"
@@ -446,13 +480,12 @@ export function AddTransactionForm({
               ) : !canPayUpi ? (
                 "Enter amount first"
               ) : (
-                "Pay with UPI"
+                "Pay & Save"
               )}
             </Button>
           </div>
 
-          {/* Direct link — uses OS-level app intent instead of JS redirect.
-              Opens UPI app only; transaction is NOT saved via this link. */}
+          {/* Last resort: native anchor — opens UPI app only, no transaction save */}
           {upiDirectLink && (
             <div className="text-center space-y-0.5">
               <a

@@ -60,7 +60,7 @@ function parseUpiUrl(url) {
   return { upiUrl: sanitizedUrl, pa, pn, am, tn };
 }
 
-export function UpiScanner({ onUpiScanned, upiData, onReset }) {
+export function UpiScanner({ onUpiScanned, upiData, onReset, upiLinkWithAmount }) {
   const [isScanning, setIsScanning] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -216,7 +216,7 @@ export function UpiScanner({ onUpiScanned, upiData, onReset }) {
           </Button>
         </div>
 
-        {/* Desktop: QR to scan on phone + copy link */}
+        {/* Desktop: QR — uses amount-injected URL once amount is entered */}
         {!isMobile && (
           <div className="flex flex-col items-center gap-3 pt-1">
             <p className="text-sm text-muted-foreground flex items-center gap-1.5">
@@ -224,8 +224,13 @@ export function UpiScanner({ onUpiScanned, upiData, onReset }) {
               Scan with your phone to pay
             </p>
             <div className="bg-white p-3 rounded-xl shadow-sm inline-block">
-              <QRCodeSVG value={upiData.upiUrl} size={160} />
+              <QRCodeSVG value={upiLinkWithAmount || upiData.upiUrl} size={160} />
             </div>
+            {!upiLinkWithAmount && (
+              <p className="text-[11px] text-muted-foreground">
+                QR updates after you enter the amount below
+              </p>
+            )}
             <Button
               type="button"
               variant="outline"
@@ -237,6 +242,11 @@ export function UpiScanner({ onUpiScanned, upiData, onReset }) {
                 ? <><Check className="h-3 w-3 mr-1.5" />Copied!</>
                 : <><Copy className="h-3 w-3 mr-1.5" />Copy UPI Link</>}
             </Button>
+            {upiLinkWithAmount && (
+              <p className="text-[11px] text-purple-600 dark:text-purple-400 font-medium">
+                QR includes your entered amount
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">
               Fill the form and click <strong>Create Transaction</strong> below
             </p>
