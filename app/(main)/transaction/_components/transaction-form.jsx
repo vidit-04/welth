@@ -222,6 +222,19 @@ export function AddTransactionForm({
   const filteredCategories = categories.filter((c) => c.type === type);
   const canPayUpi = !!amount && parseFloat(amount) > 0;
 
+  // Direct <a href> link — OS-level intent, different from window.location.href redirect.
+  // Only built when upiData is present and amount is valid.
+  const upiDirectLink = upiData?.upiUrl && canPayUpi
+    ? (() => {
+        const qIndex = upiData.upiUrl.indexOf("?");
+        const base = upiData.upiUrl.slice(0, qIndex);
+        const p = new URLSearchParams(qIndex !== -1 ? upiData.upiUrl.slice(qIndex + 1) : "");
+        p.set("am", parseFloat(amount).toFixed(2));
+        if (!p.get("cu")) p.set("cu", "INR");
+        return `${base}?${p.toString()}`;
+      })()
+    : null;
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="min-w-0 space-y-6 overflow-x-hidden">
       {/* Scanners - Only show in create mode */}
@@ -412,8 +425,8 @@ export function AddTransactionForm({
       )}
 
       {upiData && isMobileDevice ? (
-        /* UPI mode — purple gradient box replaces normal buttons */
-        <div className="rounded-xl border border-purple-200 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-800 p-4">
+        /* UPI mode — purple box replaces normal buttons */
+        <div className="rounded-xl border border-purple-200 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-800 p-4 space-y-3">
           <div className="flex gap-3">
             <Button
               type="button"
@@ -438,6 +451,22 @@ export function AddTransactionForm({
               )}
             </Button>
           </div>
+
+          {/* Direct link — uses OS-level app intent instead of JS redirect.
+              Opens UPI app only; transaction is NOT saved via this link. */}
+          {upiDirectLink && (
+            <div className="text-center space-y-0.5">
+              <a
+                href={upiDirectLink}
+                className="text-xs text-purple-700 dark:text-purple-300 underline underline-offset-2"
+              >
+                Open UPI link directly
+              </a>
+              <p className="text-[11px] text-muted-foreground">
+                Opens app only — transaction won&apos;t be saved
+              </p>
+            </div>
+          )}
         </div>
       ) : (
         /* Normal mode */
