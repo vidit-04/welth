@@ -153,24 +153,23 @@ export function AddTransactionForm({
   const handleUpiPayAndSave = () => {
     if (!upiData?.upiUrl) return;
 
-    // Rebuild the UPI URL with the form's current amount so the UPI app
-    // always opens with the correct pre-filled amount — whether or not the
-    // original QR had one.
-    const qIndex = upiData.upiUrl.indexOf("?");
-    const base = upiData.upiUrl.slice(0, qIndex);
-    const params = new URLSearchParams(
-      qIndex !== -1 ? upiData.upiUrl.slice(qIndex + 1) : ""
-    );
+    // String-patch amount into the URL without a URLSearchParams round-trip.
+    // URLSearchParams.toString() re-encodes @ → %40 (UPI IDs) and %20 → +
+    // (names); apps that do exact-string matching on pa fail silently.
     const formAmount = getValues("amount");
-    if (formAmount) {
-      params.set("am", parseFloat(formAmount).toFixed(2));
-      if (!params.get("cu")) params.set("cu", "INR");
+    let finalUrl = upiData.upiUrl;
+    if (formAmount && parseFloat(formAmount) > 0) {
+      const amValue = parseFloat(formAmount).toFixed(2);
+      if (/[?&]am=/.test(finalUrl)) {
+        finalUrl = finalUrl.replace(/([?&]am=)[^&]+/, `$1${amValue}`);
+      } else {
+        finalUrl += `&am=${amValue}`;
+      }
     }
-    upiRedirectUrlRef.current = `${base}?${params.toString()}`;
+    upiRedirectUrlRef.current = finalUrl;
 
     if (process.env.NODE_ENV === "development") {
-      console.log("[UPI] redirect URL:", upiRedirectUrlRef.current);
-      console.log("[UPI] params:", Object.fromEntries(params.entries()));
+      console.log("[UPI] redirect URL:", finalUrl);
     }
 
     handleSubmit((data) => {
@@ -222,16 +221,16 @@ export function AddTransactionForm({
   const filteredCategories = categories.filter((c) => c.type === type);
   const canPayUpi = !!amount && parseFloat(amount) > 0;
 
-  // Direct <a href> link — OS-level intent, different from window.location.href redirect.
-  // Only built when upiData is present and amount is valid.
+  // Direct <a href> link — OS-level intent, different from window.location.href.
+  // String-patched (same reason as handleUpiPayAndSave — no URLSearchParams round-trip).
   const upiDirectLink = upiData?.upiUrl && canPayUpi
     ? (() => {
-        const qIndex = upiData.upiUrl.indexOf("?");
-        const base = upiData.upiUrl.slice(0, qIndex);
-        const p = new URLSearchParams(qIndex !== -1 ? upiData.upiUrl.slice(qIndex + 1) : "");
-        p.set("am", parseFloat(amount).toFixed(2));
-        if (!p.get("cu")) p.set("cu", "INR");
-        return `${base}?${p.toString()}`;
+        const amValue = parseFloat(amount).toFixed(2);
+        const url = upiData.upiUrl;
+        if (/[?&]am=/.test(url)) {
+          return url.replace(/([?&]am=)[^&]+/, `$1${amValue}`);
+        }
+        return `${url}&am=${amValue}`;
       })()
     : null;
 

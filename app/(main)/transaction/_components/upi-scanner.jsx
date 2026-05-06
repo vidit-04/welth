@@ -22,40 +22,42 @@ function parseUpiUrl(url) {
   const queryStart = url.indexOf("?");
   const query = queryStart !== -1 ? url.slice(queryStart + 1) : "";
 
-  // Keep the original params object — only patch broken fields, never rebuild
-  const params = new URLSearchParams(query);
+  // URLSearchParams is used only for reading — NEVER for serialisation.
+  // .toString() re-encodes every value: @ → %40 in UPI IDs, %20 → + in names.
+  // Apps that do exact-string matching on pa reject the payment silently.
+  const reader = new URLSearchParams(query);
 
-  const pa = (params.get("pa") || "").trim();
-  if (!pa) return null; // UPI ID is mandatory
-  params.set("pa", pa); // safe to re-set: UPI IDs contain no encoding-sensitive chars
+  const pa = (reader.get("pa") || "").trim();
+  if (!pa) return null;
 
-  // pn: decode for display only — do NOT call params.set("pn", ...)
-  // URLSearchParams encodes spaces as "+" but original QR may use "%20";
-  // some apps reject even that subtle difference, so leave pn in params untouched.
   let pn = "";
-  try { pn = decodeURIComponent(params.get("pn") || "").trim(); }
-  catch { pn = (params.get("pn") || "").trim(); }
+  try { pn = decodeURIComponent(reader.get("pn") || "").trim(); }
+  catch { pn = (reader.get("pn") || "").trim(); }
 
-  // am: only remove if invalid — leave original string intact otherwise
-  const rawAm = params.get("am") || "";
+  const rawAm = reader.get("am") || "";
   const am =
-    rawAm && !isNaN(parseFloat(rawAm)) && parseFloat(rawAm) > 0
-      ? rawAm
-      : "";
-  if (!am) params.delete("am");
+    rawAm && !isNaN(parseFloat(rawAm)) && parseFloat(rawAm) > 0 ? rawAm : "";
 
-  // cu: only add if missing — don't override what the merchant set
-  if (!params.get("cu")) params.set("cu", "INR");
+  let tn = "";
+  try { tn = decodeURIComponent(reader.get("tn") || "").trim(); }
+  catch { tn = (reader.get("tn") || "").trim(); }
 
-  // Preserve everything else (mc, tr, tid, url, tn, etc.) untouched
+  // String-patch the original URL — touch as few bytes as possible
+  let sanitizedUrl = url;
 
-  return {
-    upiUrl: `upi://pay?${params.toString()}`,
-    pa,
-    pn,
-    am,
-    tn: params.get("tn") || "",
-  };
+  // Remove am only if present but invalid
+  if (!am && reader.has("am")) {
+    sanitizedUrl = sanitizedUrl
+      .replace(/&am=[^&]+/, "")       // mid / trailing:  &am=xxx
+      .replace(/\?am=[^&]+&/, "?")    // leading with successor: ?am=xxx&
+      .replace(/\?am=[^&]+$/, "")     // leading and sole: ?am=xxx
+      .replace(/&&/g, "&");
+  }
+
+  // Add cu=INR only if absent
+  if (!reader.get("cu")) sanitizedUrl += "&cu=INR";
+
+  return { upiUrl: sanitizedUrl, pa, pn, am, tn };
 }
 
 export function UpiScanner({ onUpiScanned, upiData, onReset }) {
