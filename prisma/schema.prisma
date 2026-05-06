@@ -27,8 +27,9 @@ model Account {
   id           String        @id @default(uuid())
   name         String
   type         AccountType
-  balance      Decimal       @default(0) // will ask inital balance while creating an account
-  isDefault    Boolean       @default(false)
+  balance         Decimal  @default(0)
+  initialBalance  Decimal  @default(0)
+  isDefault       Boolean  @default(false)
   userId       String
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade) // if user is deleted, all accounts will be deleted
   transactions Transaction[]

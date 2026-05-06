@@ -3,15 +3,13 @@
 import { db } from "@/lib/prisma";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { recalculateAccountBalance } from "@/lib/balance";
 
 const serializeDecimal = (obj) => {
   const serialized = { ...obj };
-  if (obj.balance) {
-    serialized.balance = obj.balance.toNumber();
-  }
-  if (obj.amount) {
-    serialized.amount = obj.amount.toNumber();
-  }
+  if (obj.balance) serialized.balance = obj.balance.toNumber();
+  if (obj.initialBalance) serialized.initialBalance = obj.initialBalance.toNumber();
+  if (obj.amount) serialized.amount = obj.amount.toNumber();
   return serialized;
 };
 
@@ -42,9 +40,21 @@ export async function getAccountWithTransactions(accountId) {
 
   if (!account) return null;
 
+  // Compute balance-after for each transaction.
+  // Transactions are ordered date desc, so we walk from most recent to oldest.
+  // Starting point = current account balance (post all transactions).
+  // For each transaction: balanceAfter = running; then reverse the effect to go further back.
+  let running = account.balance.toNumber();
+  const transactions = account.transactions.map((t) => {
+    const balanceAfter = running;
+    const amount = t.amount.toNumber();
+    running = t.type === "INCOME" ? running - amount : running + amount;
+    return { ...serializeDecimal(t), balanceAfter };
+  });
+
   return {
     ...serializeDecimal(account),
-    transactions: account.transactions.map(serializeDecimal),
+    transactions,
   };
 }
 
@@ -69,38 +79,16 @@ export async function bulkDeleteTransactions(transactionIds) {
 
     console.log("Found transactions to delete:", transactions.length);
 
-    // Group transactions by account to update balances
-    const accountBalanceChanges = transactions.reduce((acc, transaction) => {
-      const amount = transaction.amount.toNumber(); // Convert Decimal to number
-      const change = transaction.type === "EXPENSE" ? amount : -amount;
-      acc[transaction.accountId] = (acc[transaction.accountId] || 0) + change;
-      return acc;
-    }, {});
+    const affectedAccountIds = [...new Set(transactions.map((t) => t.accountId))];
 
-    // Delete transactions and update account balances in a transaction
+    // Delete transactions then recalculate balances from source of truth
     await db.$transaction(async (tx) => {
-      // Delete transactions
-      const deletedCount = await tx.transaction.deleteMany({
-        where: {
-          id: { in: transactionIds },
-          userId: user.id,
-        },
+      await tx.transaction.deleteMany({
+        where: { id: { in: transactionIds }, userId: user.id },
       });
 
-      console.log("Deleted transactions:", deletedCount.count);
-
-      // Update account balances
-      for (const [accountId, balanceChange] of Object.entries(
-        accountBalanceChanges
-      )) {
-        await tx.account.update({
-          where: { id: accountId },
-          data: {
-            balance: {
-              increment: balanceChange,
-            },
-          },
-        });
+      for (const accountId of affectedAccountIds) {
+        await recalculateAccountBalance(accountId, tx);
       }
     });
 

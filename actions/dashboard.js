@@ -114,13 +114,15 @@ export async function createAccount(data) {
       });
     }
 
-    // Create new account
+    // Create new account — store initialBalance separately so balance
+    // can always be recalculated from scratch via recalculateAccountBalance().
     const account = await db.account.create({
       data: {
         ...data,
         balance: balanceFloat,
+        initialBalance: balanceFloat,
         userId: user.id,
-        isDefault: shouldBeDefault, // Override the isDefault based on our logic
+        isDefault: shouldBeDefault,
       },
     });
 
