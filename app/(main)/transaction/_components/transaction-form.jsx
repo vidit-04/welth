@@ -168,6 +168,11 @@ export function AddTransactionForm({
     }
     upiRedirectUrlRef.current = `${base}?${params.toString()}`;
 
+    if (process.env.NODE_ENV === "development") {
+      console.log("[UPI] redirect URL:", upiRedirectUrlRef.current);
+      console.log("[UPI] params:", Object.fromEntries(params.entries()));
+    }
+
     handleSubmit((data) => {
       transactionFn({ ...data, amount: parseFloat(data.amount) });
     })();

@@ -16,15 +16,44 @@ import jsQR from "jsqr";
 import { QRCodeSVG } from "qrcode.react";
 
 function parseUpiUrl(url) {
-  if (!url.startsWith("upi://pay")) return null;
+  if (!url || !url.startsWith("upi://")) return null;
+  if (url.split("?")[0] !== "upi://pay") return null;
+
   const queryStart = url.indexOf("?");
   const query = queryStart !== -1 ? url.slice(queryStart + 1) : "";
+
+  // Keep the original params object — only patch broken fields, never rebuild
   const params = new URLSearchParams(query);
+
+  const pa = (params.get("pa") || "").trim();
+  if (!pa) return null; // UPI ID is mandatory
+  params.set("pa", pa); // safe to re-set: UPI IDs contain no encoding-sensitive chars
+
+  // pn: decode for display only — do NOT call params.set("pn", ...)
+  // URLSearchParams encodes spaces as "+" but original QR may use "%20";
+  // some apps reject even that subtle difference, so leave pn in params untouched.
+  let pn = "";
+  try { pn = decodeURIComponent(params.get("pn") || "").trim(); }
+  catch { pn = (params.get("pn") || "").trim(); }
+
+  // am: only remove if invalid — leave original string intact otherwise
+  const rawAm = params.get("am") || "";
+  const am =
+    rawAm && !isNaN(parseFloat(rawAm)) && parseFloat(rawAm) > 0
+      ? rawAm
+      : "";
+  if (!am) params.delete("am");
+
+  // cu: only add if missing — don't override what the merchant set
+  if (!params.get("cu")) params.set("cu", "INR");
+
+  // Preserve everything else (mc, tr, tid, url, tn, etc.) untouched
+
   return {
-    upiUrl: url,
-    pa: params.get("pa") || "",
-    pn: decodeURIComponent(params.get("pn") || ""),
-    am: params.get("am") || "",
+    upiUrl: `upi://pay?${params.toString()}`,
+    pa,
+    pn,
+    am,
     tn: params.get("tn") || "",
   };
 }
@@ -185,7 +214,7 @@ export function UpiScanner({ onUpiScanned, upiData, onReset }) {
           </Button>
         </div>
 
-        {/* Desktop only: QR to scan on phone + copy link */}
+        {/* Desktop: QR to scan on phone + copy link */}
         {!isMobile && (
           <div className="flex flex-col items-center gap-3 pt-1">
             <p className="text-sm text-muted-foreground flex items-center gap-1.5">
@@ -209,6 +238,26 @@ export function UpiScanner({ onUpiScanned, upiData, onReset }) {
             <p className="text-xs text-muted-foreground">
               Fill the form and click <strong>Create Transaction</strong> below
             </p>
+          </div>
+        )}
+
+        {/* Mobile: copy link as fallback if UPI app doesn't open */}
+        {isMobile && (
+          <div className="border-t border-purple-200 dark:border-purple-800 pt-3 space-y-2">
+            <p className="text-xs text-muted-foreground">
+              If payment doesn&apos;t open automatically, copy the link and paste it in your UPI app.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs w-full"
+              onClick={copyLink}
+            >
+              {copied
+                ? <><Check className="h-3 w-3 mr-1.5" />Copied!</>
+                : <><Copy className="h-3 w-3 mr-1.5" />Copy UPI Link</>}
+            </Button>
           </div>
         )}
       </div>
