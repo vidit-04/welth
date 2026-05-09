@@ -52,10 +52,10 @@ IMPORTANT — HANDLE TRANSCRIPTION ERRORS:
 - If you see a number + a known service name, that is ALWAYS a payment transaction.
 
 IMPLICIT PAYMENT PATTERNS (extract these even without "paid"):
-- "[amount] to [service/person]" → EXPENSE (e.g. "45 to Rapido", "200 to Swiggy")
-- "[service] [amount]" → EXPENSE (e.g. "Rapido 45", "Swiggy 200")
-- "[amount] for [item/service]" → EXPENSE (e.g. "100 for chai")
-- "[amount] [item]" → EXPENSE (e.g. "350 groceries")
+- "[amount] to [service/person]" → EXPENSE
+- "[service] [amount]" → EXPENSE
+- "[amount] for [item/service]" → EXPENSE
+- "[amount] [item]" → EXPENSE
 - "received [amount]" or "[amount] received" → INCOME
 - "salary [amount]" or "[amount] salary" → INCOME
 
@@ -119,10 +119,7 @@ Each object MUST use EXACTLY these five keys — no other key names allowed:
   "amount"      → positive number
   "type"        → "EXPENSE" or "INCOME"
   "category"    → exact category ID from the list above
-  "description" → a short phrase that adds context — NEVER just the bare service/app name.
-                  BAD: "Swiggy", "Uber", "Rapido", "DMart"
-                  GOOD: "Swiggy food order", "Uber ride", "Rapido bike ride", "DMart groceries", "Salary received"
-                  If truly no context: use ""
+  "description" → brief clean text describing the transaction (e.g. "Groceries", "Bike ride", "Food delivery")
   "date"        → YYYY-MM-DD
 Empty result: []`;
 
