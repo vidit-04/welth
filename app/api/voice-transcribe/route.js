@@ -27,21 +27,13 @@ export async function POST(request) {
       );
     }
 
-    // Strip codec params: "audio/webm;codecs=opus" → "audio/webm"
-    // Groq's format detector chokes on the codec string.
+    // Strip codec params ("audio/webm;codecs=opus" → "audio/webm") — Groq's
+    // format detector rejects the codec string. Convert to Buffer + toFile()
+    // because the raw Web API File from Next.js FormData is not reliably
+    // serialized by the Groq SDK in serverless environments.
     const cleanType = (audioFile.type ?? "audio/webm").split(";")[0].trim();
     const fileName = audioFile.name ?? `voice.${cleanType.split("/")[1] ?? "webm"}`;
-
-    console.log("\n========== [transcribe] START ==========");
-    console.log("[transcribe] Original type:", audioFile.type, "→ clean:", cleanType);
-    console.log("[transcribe] File name:", fileName, "| size:", audioFile.size, "bytes");
-
-    // Convert Web API File → Buffer → groq toFile().
-    // Passing the raw Web API File directly fails in some Next.js serverless
-    // environments because Groq's SDK multipart serializer expects a Node.js
-    // Buffer or a toFile()-wrapped object.
-    const arrayBuffer = await audioFile.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const buffer = Buffer.from(await audioFile.arrayBuffer());
     const groqFile = await toFile(buffer, fileName, { type: cleanType });
 
     const groq = new Groq({ apiKey: groqKey });
@@ -56,11 +48,7 @@ export async function POST(request) {
         "Example: Paid 45 to Rapido. Spent 200 on Swiggy. Received 5000 salary.",
     });
 
-    const transcript = transcription.text ?? "";
-    console.log("[transcribe] Transcript:", transcript);
-    console.log("========== [transcribe] END ==========\n");
-
-    return NextResponse.json({ transcript });
+    return NextResponse.json({ transcript: transcription.text ?? "" });
   } catch (error) {
     console.error("[voice-transcribe]", error);
     return NextResponse.json(

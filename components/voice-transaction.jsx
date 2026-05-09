@@ -161,8 +161,6 @@ export function VoiceTransaction({ accounts }) {
     const blob = new Blob(chunks, { type: cleanType });
     const durationMs = Date.now() - (recordingStartRef.current ?? Date.now());
 
-    console.log("[voice-client] Audio blob — type:", cleanType, "| size:", blob.size, "bytes | duration:", durationMs, "ms");
-
     if (blob.size < 1000 || durationMs < 1500) {
       toast.error("Recording too short — please speak for at least 2 seconds.");
       setStage(STAGE.IDLE);
@@ -183,16 +181,12 @@ export function VoiceTransaction({ accounts }) {
       const form = new FormData();
       form.append("audio", blob, `voice.${ext}`);
 
-      console.log("[voice-client] Sending audio to /api/voice-transcribe — filename: voice." + ext);
-
       const res = await fetch("/api/voice-transcribe", {
         method: "POST",
         body: form,
       });
 
       const resBody = await res.json().catch(() => ({}));
-      console.log("[voice-client] Transcribe response — status:", res.status, "| body:", resBody);
-
       if (!res.ok) {
         throw new Error(resBody.error || "Transcription failed.");
       }
@@ -209,11 +203,7 @@ export function VoiceTransaction({ accounts }) {
       setTranscript(text);
 
       setProcessingMsg("Extracting transactions with AI...");
-      console.log("[voice-client] Calling extractVoiceTransactions with:", text);
-
       const extracted = await extractVoiceTransactions(text);
-
-      console.log("[voice-client] extractVoiceTransactions returned:", extracted);
 
       if (!extracted || extracted.length === 0) {
         toast.error(
@@ -226,7 +216,6 @@ export function VoiceTransaction({ accounts }) {
       setTransactions(extracted);
       setStage(STAGE.REVIEW);
     } catch (err) {
-      console.error("[voice-client] Error:", err);
       toast.error(err.message || "Processing failed. Please try again.");
       setStage(STAGE.IDLE);
     } finally {
