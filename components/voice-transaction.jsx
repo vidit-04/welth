@@ -155,10 +155,13 @@ export function VoiceTransaction({ accounts }) {
   }, []);
 
   const handleAudioReady = async (chunks, mimeType) => {
-    const blob = new Blob(chunks, { type: mimeType });
+    // Strip codec params so the blob type and file extension are clean.
+    // "audio/webm;codecs=opus" → "audio/webm" prevents Groq rejecting the file.
+    const cleanType = mimeType.split(";")[0].trim() || "audio/webm";
+    const blob = new Blob(chunks, { type: cleanType });
     const durationMs = Date.now() - (recordingStartRef.current ?? Date.now());
 
-    console.log("[voice-client] Audio blob — size:", blob.size, "bytes | duration:", durationMs, "ms");
+    console.log("[voice-client] Audio blob — type:", cleanType, "| size:", blob.size, "bytes | duration:", durationMs, "ms");
 
     if (blob.size < 1000 || durationMs < 1500) {
       toast.error("Recording too short — please speak for at least 2 seconds.");
@@ -171,9 +174,9 @@ export function VoiceTransaction({ accounts }) {
     try {
       setProcessingMsg("Transcribing your speech...");
 
-      const ext = mimeType.includes("mp4")
+      const ext = cleanType.includes("mp4")
         ? "mp4"
-        : mimeType.includes("ogg")
+        : cleanType.includes("ogg")
         ? "ogg"
         : "webm";
 

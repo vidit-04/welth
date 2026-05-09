@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import Groq from "groq-sdk";
+import Groq, { toFile } from "groq-sdk";
 import { auth } from "@clerk/nextjs/server";
 
 export async function POST(request) {
@@ -27,17 +27,27 @@ export async function POST(request) {
       );
     }
 
+    // Strip codec params: "audio/webm;codecs=opus" → "audio/webm"
+    // Groq's format detector chokes on the codec string.
+    const cleanType = (audioFile.type ?? "audio/webm").split(";")[0].trim();
+    const fileName = audioFile.name ?? `voice.${cleanType.split("/")[1] ?? "webm"}`;
+
     console.log("\n========== [transcribe] START ==========");
-    console.log("[transcribe] File name:", audioFile.name);
-    console.log("[transcribe] File type:", audioFile.type);
-    console.log("[transcribe] File size:", audioFile.size, "bytes");
+    console.log("[transcribe] Original type:", audioFile.type, "→ clean:", cleanType);
+    console.log("[transcribe] File name:", fileName, "| size:", audioFile.size, "bytes");
+
+    // Convert Web API File → Buffer → groq toFile().
+    // Passing the raw Web API File directly fails in some Next.js serverless
+    // environments because Groq's SDK multipart serializer expects a Node.js
+    // Buffer or a toFile()-wrapped object.
+    const arrayBuffer = await audioFile.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const groqFile = await toFile(buffer, fileName, { type: cleanType });
 
     const groq = new Groq({ apiKey: groqKey });
 
-    // Prompt anchors Whisper to Indian financial vocabulary so it doesn't
-    // mishear "Paid" as "Page", "Fifty" as "Fifteen", etc.
     const transcription = await groq.audio.transcriptions.create({
-      file: audioFile,
+      file: groqFile,
       model: "whisper-large-v3-turbo",
       response_format: "json",
       prompt:
