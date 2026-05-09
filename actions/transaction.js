@@ -8,10 +8,12 @@ import aj from "@/lib/arcjet";
 import { request } from "@arcjet/next";
 import { recalculateBalancesFromDate } from "@/lib/balance";
 
-const serializeAmount = (obj) => ({
-  ...obj,
-  amount: obj.amount.toNumber(),
-});
+const serializeAmount = (obj) => {
+  const out = { ...obj };
+  if (out.amount != null) out.amount = out.amount?.toNumber?.() ?? out.amount;
+  if (out.balanceAfter != null) out.balanceAfter = out.balanceAfter?.toNumber?.() ?? out.balanceAfter;
+  return out;
+};
 
 const GEMINI_RECEIPT_MODELS = [
   "gemini-3.1-flash-lite",
@@ -117,6 +119,14 @@ export async function createTransaction(data) {
 
     if (!user) {
       throw new Error("User not found");
+    }
+
+    // Reject future-dated transactions
+    const txDate = new Date(data.date);
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+    if (txDate > endOfToday) {
+      throw new Error("Transaction date cannot be in the future.");
     }
 
     const account = await db.account.findUnique({
@@ -264,7 +274,7 @@ export async function getUserTransactions(query = {}) {
       },
     });
 
-    return { success: true, data: transactions };
+    return { success: true, data: transactions.map(serializeAmount) };
   } catch (error) {
     throw new Error(error.message);
   }

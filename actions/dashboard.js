@@ -11,6 +11,7 @@ const serializeTransaction = (obj) => {
   if (obj.balance != null) serialized.balance = obj.balance?.toNumber?.() ?? obj.balance;
   if (obj.initialBalance != null) serialized.initialBalance = obj.initialBalance?.toNumber?.() ?? obj.initialBalance;
   if (obj.amount != null) serialized.amount = obj.amount?.toNumber?.() ?? obj.amount;
+  if (obj.balanceAfter != null) serialized.balanceAfter = obj.balanceAfter?.toNumber?.() ?? obj.balanceAfter;
   return serialized;
 };
 
