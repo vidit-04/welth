@@ -12,6 +12,7 @@ import {
   ChevronRight,
   RefreshCw,
   Clock,
+  CalendarDays,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -49,7 +50,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { categoryColors } from "@/data/categories";
+import { categoryColors, defaultCategories } from "@/data/categories";
 import { bulkDeleteTransactions } from "@/actions/account";
 import useFetch from "@/hooks/use-fetch";
 import { BarLoader } from "react-spinners";
@@ -79,6 +80,9 @@ export function TransactionTable({ transactions }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [recurringFilter, setRecurringFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const router = useRouter();
 
@@ -101,6 +105,22 @@ export function TransactionTable({ transactions }) {
         if (recurringFilter === "recurring") return transaction.isRecurring;
         return !transaction.isRecurring;
       });
+    }
+
+    if (categoryFilter) {
+      result = result.filter((t) => t.category === categoryFilter);
+    }
+
+    if (dateFrom) {
+      const from = new Date(dateFrom);
+      from.setHours(0, 0, 0, 0);
+      result = result.filter((t) => new Date(t.date) >= from);
+    }
+
+    if (dateTo) {
+      const to = new Date(dateTo);
+      to.setHours(23, 59, 59, 999);
+      result = result.filter((t) => new Date(t.date) <= to);
     }
 
     result.sort((a, b) => {
@@ -127,7 +147,7 @@ export function TransactionTable({ transactions }) {
     });
 
     return result;
-  }, [transactions, searchTerm, typeFilter, recurringFilter, sortConfig]);
+  }, [transactions, searchTerm, typeFilter, recurringFilter, categoryFilter, dateFrom, dateTo, sortConfig]);
 
   const totalPages = Math.ceil(filteredAndSortedTransactions.length / ITEMS_PER_PAGE);
   const paginatedTransactions = useMemo(() => {
@@ -210,6 +230,9 @@ export function TransactionTable({ transactions }) {
     setSearchTerm("");
     setTypeFilter("");
     setRecurringFilter("");
+    setCategoryFilter("");
+    setDateFrom("");
+    setDateTo("");
     setCurrentPage(1);
   };
 
@@ -218,7 +241,7 @@ export function TransactionTable({ transactions }) {
     setSelectedIds([]);
   };
 
-  const hasActiveFilters = Boolean(searchTerm || typeFilter || recurringFilter);
+  const hasActiveFilters = Boolean(searchTerm || typeFilter || recurringFilter || categoryFilter || dateFrom || dateTo);
 
   return (
     <div className="space-y-4">
@@ -226,6 +249,7 @@ export function TransactionTable({ transactions }) {
         <BarLoader className="mt-4" width={"100%"} color="#9333ea" />
       )}
 
+      {/* Row 1: search + type + recurring + category */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
         <div className="relative flex-1">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -240,7 +264,7 @@ export function TransactionTable({ transactions }) {
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:items-center">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:flex lg:items-center">
           <Select
             value={typeFilter}
             onValueChange={(value) => {
@@ -248,12 +272,31 @@ export function TransactionTable({ transactions }) {
               setCurrentPage(1);
             }}
           >
-            <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectTrigger className="w-full lg:w-[130px]">
               <SelectValue placeholder="All Types" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="INCOME">Income</SelectItem>
               <SelectItem value="EXPENSE">Expense</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={categoryFilter}
+            onValueChange={(value) => {
+              setCategoryFilter(value);
+              setCurrentPage(1);
+            }}
+          >
+            <SelectTrigger className="w-full lg:w-[150px]">
+              <SelectValue placeholder="All Categories" />
+            </SelectTrigger>
+            <SelectContent>
+              {defaultCategories.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
@@ -264,7 +307,7 @@ export function TransactionTable({ transactions }) {
               setCurrentPage(1);
             }}
           >
-            <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectTrigger className="col-span-2 w-full sm:col-span-1 lg:w-[150px]">
               <SelectValue placeholder="All Transactions" />
             </SelectTrigger>
             <SelectContent>
@@ -272,19 +315,47 @@ export function TransactionTable({ transactions }) {
               <SelectItem value="non-recurring">Non-recurring Only</SelectItem>
             </SelectContent>
           </Select>
-
-          {hasActiveFilters && (
-            <Button
-              variant="outline"
-              className="w-full sm:col-span-2 lg:w-auto"
-              onClick={handleClearFilters}
-              title="Clear filters"
-            >
-              <X className="mr-2 h-4 w-4" />
-              Clear Filters
-            </Button>
-          )}
         </div>
+      </div>
+
+      {/* Row 2: date range + clear */}
+      <div className="flex flex-wrap items-center gap-2">
+        <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <Input
+          type="date"
+          value={dateFrom}
+          max={dateTo || undefined}
+          onChange={(e) => {
+            setDateFrom(e.target.value);
+            setCurrentPage(1);
+          }}
+          className="h-9 w-[145px] text-sm"
+          aria-label="From date"
+        />
+        <span className="text-sm text-muted-foreground">to</span>
+        <Input
+          type="date"
+          value={dateTo}
+          min={dateFrom || undefined}
+          onChange={(e) => {
+            setDateTo(e.target.value);
+            setCurrentPage(1);
+          }}
+          className="h-9 w-[145px] text-sm"
+          aria-label="To date"
+        />
+
+        {hasActiveFilters && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleClearFilters}
+            title="Clear all filters"
+          >
+            <X className="mr-1.5 h-3.5 w-3.5" />
+            Clear
+          </Button>
+        )}
       </div>
 
       {selectedIds.length > 0 && (
@@ -362,17 +433,24 @@ export function TransactionTable({ transactions }) {
                 >
                   {formatCategoryName(transaction.category)}
                 </Badge>
-                <p
-                  className={cn(
-                    "text-sm font-semibold",
-                    transaction.type === "EXPENSE"
-                      ? "text-red-500"
-                      : "text-green-500"
+                <div className="flex flex-col items-end gap-0.5">
+                  <p
+                    className={cn(
+                      "text-sm font-semibold",
+                      transaction.type === "EXPENSE"
+                        ? "text-red-500"
+                        : "text-green-500"
+                    )}
+                  >
+                    {transaction.type === "EXPENSE" ? "-" : "+"}₹
+                    {Number(transaction.amount).toFixed(2)}
+                  </p>
+                  {transaction.balanceAfter != null && (
+                    <p className="text-xs text-muted-foreground">
+                      Bal: ₹{Number(transaction.balanceAfter).toFixed(2)}
+                    </p>
                   )}
-                >
-                  {transaction.type === "EXPENSE" ? "-" : "+"}₹
-                  {Number(transaction.amount).toFixed(2)}
-                </p>
+                </div>
               </div>
 
               <div>
