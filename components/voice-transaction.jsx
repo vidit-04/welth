@@ -72,6 +72,7 @@ export function VoiceTransaction({ accounts }) {
   const streamRef = useRef(null);
   const timerRef = useRef(null);
   const mimeTypeRef = useRef("audio/webm");
+  const recordingStartRef = useRef(null);
 
   useEffect(() => {
     return () => {
@@ -133,6 +134,7 @@ export function VoiceTransaction({ accounts }) {
         handleAudioReady(chunksRef.current, mimeTypeRef.current);
 
       recorder.start(200);
+      recordingStartRef.current = Date.now();
       setStage(STAGE.RECORDING);
       setRecordingSecs(0);
 
@@ -154,11 +156,12 @@ export function VoiceTransaction({ accounts }) {
 
   const handleAudioReady = async (chunks, mimeType) => {
     const blob = new Blob(chunks, { type: mimeType });
+    const durationMs = Date.now() - (recordingStartRef.current ?? Date.now());
 
-    console.log("[voice-client] Audio blob — size:", blob.size, "bytes | type:", blob.type);
+    console.log("[voice-client] Audio blob — size:", blob.size, "bytes | duration:", durationMs, "ms");
 
-    if (blob.size < 500) {
-      toast.error("Recording too short. Please speak for at least one second.");
+    if (blob.size < 1000 || durationMs < 1500) {
+      toast.error("Recording too short — please speak for at least 2 seconds.");
       setStage(STAGE.IDLE);
       return;
     }
@@ -192,9 +195,10 @@ export function VoiceTransaction({ accounts }) {
       }
 
       const text = resBody.transcript ?? "";
+      const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
 
-      if (!text?.trim()) {
-        toast.error("Could not understand the recording. Please speak clearly and try again.");
+      if (!text?.trim() || wordCount < 2) {
+        toast.error("Could not detect enough speech — please speak clearly for at least 2 seconds.");
         setStage(STAGE.IDLE);
         return;
       }

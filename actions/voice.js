@@ -110,16 +110,17 @@ TRANSACTION TYPE:
 - EXPENSE: paid, spent, bought, page (transcription of "paid"), to [service], for [item], kharcha
 - INCOME: received, got, salary, earned, mila, credited, refund
 
-EXAMPLES of correct extraction:
-- "Page 45 to Rapido" → [{"amount":45,"type":"EXPENSE","category":"transportation","description":"Rapido ride","date":"${todayStr}"}]
-- "Paid 350 for groceries and 120 for Uber" → two EXPENSE transactions
-- "Received 5000 salary" → [{"amount":5000,"type":"INCOME","category":"salary","description":"Salary received","date":"${todayStr}"}]
-- "Swiggy 200 yesterday" → [{"amount":200,"type":"EXPENSE","category":"food","description":"Swiggy order","date":"${yesterdayStr}"}]
+CRITICAL — READ BEFORE RESPONDING:
+1. Extract ONLY transactions EXPLICITLY stated in the TEXT above.
+2. Do NOT invent, assume, guess, or hallucinate any transaction.
+3. Do NOT use anything from these instructions as a transaction template.
+4. If the TEXT is empty, ambient noise, or contains no clear financial information → return [].
+5. Every transaction MUST have a clear amount AND a clear subject in the TEXT.
 
-STRICT OUTPUT FORMAT:
-Return ONLY a raw JSON array. No markdown. No backticks. No explanation text. No comments.
-Start your response with [ and end with ].
-If truly no transactions found: []`;
+OUTPUT FORMAT:
+Return ONLY a raw JSON array. No markdown. No backticks. No explanation.
+Start with [ and end with ].
+Empty result: []`;
 
   let lastError;
   for (const modelName of GEMINI_MODELS) {
