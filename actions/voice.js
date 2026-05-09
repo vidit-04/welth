@@ -120,6 +120,12 @@ CRITICAL — READ BEFORE RESPONDING:
 OUTPUT FORMAT:
 Return ONLY a raw JSON array. No markdown. No backticks. No explanation.
 Start with [ and end with ].
+Each object MUST use EXACTLY these five keys — no other key names allowed:
+  "amount"      → positive number
+  "type"        → "EXPENSE" or "INCOME"
+  "category"    → exact category ID from the list above
+  "description" → brief clean text (e.g. "Rapido ride", "DMart groceries")
+  "date"        → YYYY-MM-DD
 Empty result: []`;
 
   let lastError;
@@ -197,7 +203,7 @@ Empty result: []`;
           amount: Math.abs(amountNum),
           type: t.type,
           category,
-          description: String(t.description ?? "").trim(),
+          description: String(t.description ?? t.subject ?? t.item ?? t.name ?? t.title ?? "").trim(),
           date: resolvedDate,
         });
       }
