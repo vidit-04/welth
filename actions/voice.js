@@ -7,7 +7,6 @@ import { format, subDays } from "date-fns";
 
 const VALID_CATEGORY_IDS = new Set(defaultCategories.map((c) => c.id));
 
-// Same order as the existing receipt scanner in actions/transaction.js
 const GEMINI_MODELS = [
   "gemini-2.5-flash",
   "gemini-2.0-flash",
@@ -35,10 +34,6 @@ export async function extractVoiceTransactions(transcript) {
   const todayStr = format(today, "yyyy-MM-dd");
   const yesterdayStr = format(subDays(today, 1), "yyyy-MM-dd");
 
-  console.log("\n========== [voice] EXTRACTION START ==========");
-  console.log("[voice] Transcript:", transcript);
-  console.log("[voice] Today:", todayStr, "| Yesterday:", yesterdayStr);
-
   const categoryDefs = defaultCategories
     .map((c) => `"${c.id}" = ${c.name} [${c.type}]`)
     .join(", ");
@@ -57,10 +52,10 @@ IMPORTANT — HANDLE TRANSCRIPTION ERRORS:
 - If you see a number + a known service name, that is ALWAYS a payment transaction.
 
 IMPLICIT PAYMENT PATTERNS (extract these even without "paid"):
-- "[amount] to [service/person]" → EXPENSE (e.g. "45 to Rapido", "200 to Swiggy")
-- "[service] [amount]" → EXPENSE (e.g. "Rapido 45", "Swiggy 200")
-- "[amount] for [item/service]" → EXPENSE (e.g. "100 for chai")
-- "[amount] [item]" → EXPENSE (e.g. "350 groceries")
+- "[amount] to [service/person]" → EXPENSE
+- "[service] [amount]" → EXPENSE
+- "[amount] for [item/service]" → EXPENSE
+- "[amount] [item]" → EXPENSE
 - "received [amount]" or "[amount] received" → INCOME
 - "salary [amount]" or "[amount] salary" → INCOME
 
@@ -110,73 +105,51 @@ TRANSACTION TYPE:
 - EXPENSE: paid, spent, bought, page (transcription of "paid"), to [service], for [item], kharcha
 - INCOME: received, got, salary, earned, mila, credited, refund
 
-EXAMPLES of correct extraction:
-- "Page 45 to Rapido" → [{"amount":45,"type":"EXPENSE","category":"transportation","description":"Rapido ride","date":"${todayStr}"}]
-- "Paid 350 for groceries and 120 for Uber" → two EXPENSE transactions
-- "Received 5000 salary" → [{"amount":5000,"type":"INCOME","category":"salary","description":"Salary received","date":"${todayStr}"}]
-- "Swiggy 200 yesterday" → [{"amount":200,"type":"EXPENSE","category":"food","description":"Swiggy order","date":"${yesterdayStr}"}]
+CRITICAL — READ BEFORE RESPONDING:
+1. Extract ONLY transactions EXPLICITLY stated in the TEXT above.
+2. Do NOT invent, assume, guess, or hallucinate any transaction.
+3. Do NOT use anything from these instructions as a transaction template.
+4. If the TEXT is empty, ambient noise, or contains no clear financial information → return [].
+5. Every transaction MUST have a clear amount AND a clear subject in the TEXT.
 
-STRICT OUTPUT FORMAT:
-Return ONLY a raw JSON array. No markdown. No backticks. No explanation text. No comments.
-Start your response with [ and end with ].
-If truly no transactions found: []`;
+OUTPUT FORMAT:
+Return ONLY a raw JSON array. No markdown. No backticks. No explanation.
+Start with [ and end with ].
+Each object MUST use EXACTLY these five keys — no other key names allowed:
+  "amount"      → positive number
+  "type"        → "EXPENSE" or "INCOME"
+  "category"    → exact category ID from the list above
+  "description" → brief clean text describing the transaction (e.g. "Groceries", "Bike ride", "Food delivery")
+  "date"        → YYYY-MM-DD
+Empty result: []`;
 
   let lastError;
   for (const modelName of GEMINI_MODELS) {
-    console.log(`\n[voice] Trying model: ${modelName}`);
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: modelName });
       const result = await model.generateContent(prompt);
       const rawText = result.response.text().trim();
 
-      console.log("[voice] Raw AI response:\n---\n" + rawText + "\n---");
-
       const cleaned = rawText
         .replace(/^```(?:json)?\s*/i, "")
         .replace(/\s*```\s*$/i, "")
         .trim();
 
-      console.log("[voice] Cleaned text:\n---\n" + cleaned + "\n---");
-
       const start = cleaned.indexOf("[");
       const end = cleaned.lastIndexOf("]");
-      if (start === -1 || end === -1) {
-        console.log("[voice] ERROR: No JSON array brackets found in response.");
-        throw new Error("No JSON array in AI response.");
-      }
+      if (start === -1 || end === -1) throw new Error("No JSON array in AI response.");
 
-      const jsonSlice = cleaned.slice(start, end + 1);
-      console.log("[voice] JSON slice to parse:", jsonSlice);
+      const parsed = JSON.parse(cleaned.slice(start, end + 1));
+      if (!Array.isArray(parsed)) throw new Error("AI response is not an array.");
 
-      const parsed = JSON.parse(jsonSlice);
-      if (!Array.isArray(parsed)) {
-        console.log("[voice] ERROR: Parsed value is not an array:", typeof parsed);
-        throw new Error("AI response is not an array.");
-      }
-
-      console.log("[voice] Parsed array (" + parsed.length + " items):", JSON.stringify(parsed, null, 2));
-
-      // Validate each item and log why any are rejected
       const validated = [];
       for (const t of parsed) {
-        const amountRaw = t?.amount;
-        const amountNum = Number(amountRaw);
-        const typeOk = ["INCOME", "EXPENSE"].includes(t?.type);
-        const amountOk = !isNaN(amountNum) && amountNum > 0;
+        if (!t || typeof t !== "object") continue;
 
-        if (!t || typeof t !== "object") {
-          console.log("[voice] REJECTED (not object):", t);
-          continue;
-        }
-        if (!amountOk) {
-          console.log(`[voice] REJECTED (bad amount — raw="${amountRaw}", parsed=${amountNum}):`, t);
-          continue;
-        }
-        if (!typeOk) {
-          console.log(`[voice] REJECTED (bad type — got "${t.type}"):`, t);
-          continue;
-        }
+        const amountNum = Number(t?.amount);
+        if (isNaN(amountNum) || amountNum <= 0) continue;
+        if (!["INCOME", "EXPENSE"].includes(t?.type)) continue;
 
         const category = VALID_CATEGORY_IDS.has(String(t.category))
           ? String(t.category)
@@ -184,11 +157,6 @@ If truly no transactions found: []`;
           ? "other-income"
           : "other-expense";
 
-        if (!VALID_CATEGORY_IDS.has(String(t.category))) {
-          console.log(`[voice] Category "${t.category}" not found — falling back to "${category}"`);
-        }
-
-        // Cap future dates to today
         let resolvedDate = isValidDateString(t.date) ? t.date : todayStr;
         if (resolvedDate > todayStr) resolvedDate = todayStr;
 
@@ -196,23 +164,18 @@ If truly no transactions found: []`;
           amount: Math.abs(amountNum),
           type: t.type,
           category,
-          description: String(t.description ?? "").trim(),
+          description: String(
+            t.description ?? t.subject ?? t.item ?? t.name ?? t.title ?? ""
+          ).trim(),
           date: resolvedDate,
         });
       }
 
-      console.log(`[voice] Final validated transactions (${validated.length}):`, JSON.stringify(validated, null, 2));
-      console.log("========== [voice] EXTRACTION END ==========\n");
       return validated;
     } catch (err) {
-      console.log(`[voice] Model "${modelName}" failed:`, err.message);
       lastError = err;
     }
   }
 
-  console.log("[voice] All models failed. Last error:", lastError?.message);
-  console.log("========== [voice] EXTRACTION END (FAILED) ==========\n");
-  throw new Error(
-    `AI extraction failed: ${lastError?.message ?? "Unknown error"}`
-  );
+  throw new Error(`AI extraction failed: ${lastError?.message ?? "Unknown error"}`);
 }

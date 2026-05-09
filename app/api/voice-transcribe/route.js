@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import Groq from "groq-sdk";
+import Groq, { toFile } from "groq-sdk";
 import { auth } from "@clerk/nextjs/server";
 
 export async function POST(request) {
@@ -27,17 +27,19 @@ export async function POST(request) {
       );
     }
 
-    console.log("\n========== [transcribe] START ==========");
-    console.log("[transcribe] File name:", audioFile.name);
-    console.log("[transcribe] File type:", audioFile.type);
-    console.log("[transcribe] File size:", audioFile.size, "bytes");
+    // Strip codec params ("audio/webm;codecs=opus" → "audio/webm") — Groq's
+    // format detector rejects the codec string. Convert to Buffer + toFile()
+    // because the raw Web API File from Next.js FormData is not reliably
+    // serialized by the Groq SDK in serverless environments.
+    const cleanType = (audioFile.type ?? "audio/webm").split(";")[0].trim();
+    const fileName = audioFile.name ?? `voice.${cleanType.split("/")[1] ?? "webm"}`;
+    const buffer = Buffer.from(await audioFile.arrayBuffer());
+    const groqFile = await toFile(buffer, fileName, { type: cleanType });
 
     const groq = new Groq({ apiKey: groqKey });
 
-    // Prompt anchors Whisper to Indian financial vocabulary so it doesn't
-    // mishear "Paid" as "Page", "Fifty" as "Fifteen", etc.
     const transcription = await groq.audio.transcriptions.create({
-      file: audioFile,
+      file: groqFile,
       model: "whisper-large-v3-turbo",
       response_format: "json",
       prompt:
@@ -46,11 +48,7 @@ export async function POST(request) {
         "Example: Paid 45 to Rapido. Spent 200 on Swiggy. Received 5000 salary.",
     });
 
-    const transcript = transcription.text ?? "";
-    console.log("[transcribe] Transcript:", transcript);
-    console.log("========== [transcribe] END ==========\n");
-
-    return NextResponse.json({ transcript });
+    return NextResponse.json({ transcript: transcription.text ?? "" });
   } catch (error) {
     console.error("[voice-transcribe]", error);
     return NextResponse.json(

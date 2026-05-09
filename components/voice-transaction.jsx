@@ -72,6 +72,7 @@ export function VoiceTransaction({ accounts }) {
   const streamRef = useRef(null);
   const timerRef = useRef(null);
   const mimeTypeRef = useRef("audio/webm");
+  const recordingStartRef = useRef(null);
 
   useEffect(() => {
     return () => {
@@ -133,6 +134,7 @@ export function VoiceTransaction({ accounts }) {
         handleAudioReady(chunksRef.current, mimeTypeRef.current);
 
       recorder.start(200);
+      recordingStartRef.current = Date.now();
       setStage(STAGE.RECORDING);
       setRecordingSecs(0);
 
@@ -153,12 +155,14 @@ export function VoiceTransaction({ accounts }) {
   }, []);
 
   const handleAudioReady = async (chunks, mimeType) => {
-    const blob = new Blob(chunks, { type: mimeType });
+    // Strip codec params so the blob type and file extension are clean.
+    // "audio/webm;codecs=opus" → "audio/webm" prevents Groq rejecting the file.
+    const cleanType = mimeType.split(";")[0].trim() || "audio/webm";
+    const blob = new Blob(chunks, { type: cleanType });
+    const durationMs = Date.now() - (recordingStartRef.current ?? Date.now());
 
-    console.log("[voice-client] Audio blob — size:", blob.size, "bytes | type:", blob.type);
-
-    if (blob.size < 500) {
-      toast.error("Recording too short. Please speak for at least one second.");
+    if (blob.size < 1000 || durationMs < 1500) {
+      toast.error("Recording too short — please speak for at least 2 seconds.");
       setStage(STAGE.IDLE);
       return;
     }
@@ -168,16 +172,14 @@ export function VoiceTransaction({ accounts }) {
     try {
       setProcessingMsg("Transcribing your speech...");
 
-      const ext = mimeType.includes("mp4")
+      const ext = cleanType.includes("mp4")
         ? "mp4"
-        : mimeType.includes("ogg")
+        : cleanType.includes("ogg")
         ? "ogg"
         : "webm";
 
       const form = new FormData();
       form.append("audio", blob, `voice.${ext}`);
-
-      console.log("[voice-client] Sending audio to /api/voice-transcribe — filename: voice." + ext);
 
       const res = await fetch("/api/voice-transcribe", {
         method: "POST",
@@ -185,16 +187,15 @@ export function VoiceTransaction({ accounts }) {
       });
 
       const resBody = await res.json().catch(() => ({}));
-      console.log("[voice-client] Transcribe response — status:", res.status, "| body:", resBody);
-
       if (!res.ok) {
         throw new Error(resBody.error || "Transcription failed.");
       }
 
       const text = resBody.transcript ?? "";
+      const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
 
-      if (!text?.trim()) {
-        toast.error("Could not understand the recording. Please speak clearly and try again.");
+      if (!text?.trim() || wordCount < 2) {
+        toast.error("Could not detect enough speech — please speak clearly for at least 2 seconds.");
         setStage(STAGE.IDLE);
         return;
       }
@@ -202,11 +203,7 @@ export function VoiceTransaction({ accounts }) {
       setTranscript(text);
 
       setProcessingMsg("Extracting transactions with AI...");
-      console.log("[voice-client] Calling extractVoiceTransactions with:", text);
-
       const extracted = await extractVoiceTransactions(text);
-
-      console.log("[voice-client] extractVoiceTransactions returned:", extracted);
 
       if (!extracted || extracted.length === 0) {
         toast.error(
@@ -219,7 +216,6 @@ export function VoiceTransaction({ accounts }) {
       setTransactions(extracted);
       setStage(STAGE.REVIEW);
     } catch (err) {
-      console.error("[voice-client] Error:", err);
       toast.error(err.message || "Processing failed. Please try again.");
       setStage(STAGE.IDLE);
     } finally {
