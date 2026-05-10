@@ -47,18 +47,20 @@ model Transaction {
   amount           Decimal
   description      String?
   date             DateTime
-  category         String           
+  category         String
   receiptUrl       String?
   isRecurring      Boolean           @default(false)
   recurringInterval RecurringInterval? // Only used if isRecurring is true
   nextRecurringDate DateTime?         // Next date for recurring transaction
   lastProcessed    DateTime?         // Last time this recurring transaction was processed
+  reminderEnabled  Boolean           @default(false)
   balanceAfter     Decimal?
   status           TransactionStatus  @default(COMPLETED)
   userId           String
   user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   accountId        String
   account          Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  reminderLogs     RecurringReminderLog[]
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
@@ -106,4 +108,17 @@ enum RecurringInterval {
   WEEKLY
   MONTHLY
   YEARLY
+}
+
+model RecurringReminderLog {
+  id                     String      @id @default(uuid())
+  recurringTransactionId String
+  reminderType           String      // "upcoming" | "due-today"
+  reminderForDate        DateTime    // The due date this reminder is associated with (UTC midnight)
+  sentAt                 DateTime    @default(now())
+  transaction            Transaction @relation(fields: [recurringTransactionId], references: [id], onDelete: Cascade)
+
+  @@unique([recurringTransactionId, reminderType, reminderForDate])
+  @@index([recurringTransactionId])
+  @@map("recurring_reminder_logs")
 }
