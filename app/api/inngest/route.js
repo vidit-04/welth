@@ -7,6 +7,7 @@ import {
   processRecurringTransaction,
   triggerRecurringTransactions,
 } from "@/lib/inngest/function";
+import { sendRecurringReminders } from "@/lib/inngest/recurring-reminders";
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -15,6 +16,7 @@ export const { GET, POST, PUT } = serve({
     triggerRecurringTransactions,
     generateMonthlyReports,
     checkBudgetAlerts,
+    sendRecurringReminders,
   ],
 });
 

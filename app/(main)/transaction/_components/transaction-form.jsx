@@ -65,6 +65,7 @@ export function AddTransactionForm({
             ...(initialData.recurringInterval && {
               recurringInterval: initialData.recurringInterval,
             }),
+            reminderEnabled: initialData.reminderEnabled ?? false,
           }
         : {
             type: "EXPENSE",
@@ -74,6 +75,7 @@ export function AddTransactionForm({
             category: "",
             date: new Date(),
             isRecurring: false,
+            reminderEnabled: false,
           },
   });
 
@@ -124,7 +126,12 @@ export function AddTransactionForm({
 
   const type = watch("type");
   const isRecurring = watch("isRecurring");
+  const recurringInterval = watch("recurringInterval");
+  const reminderEnabled = watch("reminderEnabled");
   const date = watch("date");
+
+  const supportsReminders =
+    isRecurring && (recurringInterval === "MONTHLY" || recurringInterval === "YEARLY");
 
   const filteredCategories = categories.filter(
     (category) => category.type === type
@@ -293,7 +300,13 @@ export function AddTransactionForm({
         <div className="space-y-2">
           <label className="text-sm font-medium">Recurring Interval</label>
           <Select
-            onValueChange={(value) => setValue("recurringInterval", value)}
+            onValueChange={(value) => {
+              setValue("recurringInterval", value);
+              // Clear reminder if switching to non-supported interval
+              if (value !== "MONTHLY" && value !== "YEARLY") {
+                setValue("reminderEnabled", false);
+              }
+            }}
             defaultValue={getValues("recurringInterval")}
           >
             <SelectTrigger>
@@ -311,6 +324,25 @@ export function AddTransactionForm({
               {errors.recurringInterval.message}
             </p>
           )}
+        </div>
+      )}
+
+      {/* Email Reminder Toggle — only for monthly/yearly recurring transactions */}
+      {supportsReminders && (
+        <div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 space-y-0.5">
+            <label className="text-base font-medium">Email Reminders</label>
+            <div className="text-sm text-muted-foreground break-words">
+              {recurringInterval === "MONTHLY"
+                ? "Get reminded 7 days before and on the due date each month"
+                : "Get reminded 30 days before and on the due date each year"}
+            </div>
+          </div>
+          <Switch
+            className="self-start sm:self-auto"
+            checked={reminderEnabled}
+            onCheckedChange={(checked) => setValue("reminderEnabled", checked)}
+          />
         </div>
       )}
 
