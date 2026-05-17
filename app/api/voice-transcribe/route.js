@@ -62,8 +62,19 @@ export async function POST(request) {
     // Block 1: unexpected language → very likely hallucination.
     // Fan/AC noise causes Whisper to hallucinate in random languages
     // (Russian, Icelandic, etc.) with no_speech_prob=0 (wrongly confident).
+    // Groq verbose_json returns full names ("english") not ISO codes ("en"),
+    // so include both forms.
     const ALLOWED_LANGS = new Set([
-      "en", "hi", "mr", "gu", "ta", "te", "kn", "bn", "pa", "ur",
+      "en", "english",
+      "hi", "hindi",
+      "mr", "marathi",
+      "gu", "gujarati",
+      "ta", "tamil",
+      "te", "telugu",
+      "kn", "kannada",
+      "bn", "bengali",
+      "pa", "punjabi",
+      "ur", "urdu",
     ]);
     if (!ALLOWED_LANGS.has(detectedLang)) {
       console.log(`[transcribe] BLOCKED — unexpected language "${detectedLang}"`);
