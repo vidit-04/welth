@@ -38,15 +38,43 @@ export async function POST(request) {
 
     const groq = new Groq({ apiKey: groqKey });
 
+    // verbose_json gives language detection + no_speech_prob per segment.
+    // No prompt — vocabulary hints get hallucinated back verbatim on silence.
     const transcription = await groq.audio.transcriptions.create({
       file: groqFile,
       model: "whisper-large-v3-turbo",
-      response_format: "json",
-      prompt:
-        "Paid, spent, received, salary, rupees, expense, income. " +
-        "Apps: Uber, Ola, Rapido, Swiggy, Zomato, DMart, BigBasket, PhonePe, Paytm. " +
-        "Example: Paid 45 to Rapido. Spent 200 on Swiggy. Received 5000 salary.",
+      response_format: "verbose_json",
     });
+
+    const segments = transcription.segments ?? [];
+    const detectedLang = transcription.language ?? "en";
+    const avgNoSpeech =
+      segments.length > 0
+        ? segments.reduce((sum, s) => sum + (s.no_speech_prob ?? 0), 0) /
+          segments.length
+        : 0;
+
+    console.log(
+      `[transcribe] lang=${detectedLang} segments=${segments.length} ` +
+        `avgNoSpeech=${avgNoSpeech.toFixed(3)} transcript="${transcription.text?.trim()}"`
+    );
+
+    // Block 1: unexpected language → very likely hallucination.
+    // Fan/AC noise causes Whisper to hallucinate in random languages
+    // (Russian, Icelandic, etc.) with no_speech_prob=0 (wrongly confident).
+    const ALLOWED_LANGS = new Set([
+      "en", "hi", "mr", "gu", "ta", "te", "kn", "bn", "pa", "ur",
+    ]);
+    if (!ALLOWED_LANGS.has(detectedLang)) {
+      console.log(`[transcribe] BLOCKED — unexpected language "${detectedLang}"`);
+      return NextResponse.json({ transcript: "" });
+    }
+
+    // Block 2: Whisper itself says no speech detected.
+    if (avgNoSpeech > 0.8) {
+      console.log(`[transcribe] BLOCKED — avgNoSpeech=${avgNoSpeech.toFixed(3)}`);
+      return NextResponse.json({ transcript: "" });
+    }
 
     return NextResponse.json({ transcript: transcription.text ?? "" });
   } catch (error) {

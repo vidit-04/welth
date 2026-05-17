@@ -161,6 +161,8 @@ export function VoiceTransaction({ accounts }) {
     const blob = new Blob(chunks, { type: cleanType });
     const durationMs = Date.now() - (recordingStartRef.current ?? Date.now());
 
+    console.log(`[voice] blob=${blob.size}B duration=${durationMs}ms type=${cleanType}`);
+
     if (blob.size < 1000 || durationMs < 1500) {
       toast.error("Recording too short — please speak for at least 2 seconds.");
       setStage(STAGE.IDLE);
@@ -187,12 +189,15 @@ export function VoiceTransaction({ accounts }) {
       });
 
       const resBody = await res.json().catch(() => ({}));
+      console.log(`[voice] transcribe status=${res.status} transcript="${resBody.transcript}"`);
       if (!res.ok) {
         throw new Error(resBody.error || "Transcription failed.");
       }
 
       const text = resBody.transcript ?? "";
       const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+
+      console.log(`[voice] wordCount=${wordCount}`);
 
       if (!text?.trim() || wordCount < 2) {
         toast.error("Could not detect enough speech — please speak clearly for at least 2 seconds.");
@@ -259,11 +264,19 @@ export function VoiceTransaction({ accounts }) {
     setStage(STAGE.CREATING);
 
     let successCount = 0;
-    let failCount = 0;
+    const errors = [];
 
-    // Create in reverse so the table (sorted createdAt DESC) shows them
-    // in the same order they were spoken (first spoken → top of list).
-    for (const t of [...transactions].reverse()) {
+    // Assign explicit createdAt offsets so the account table (sorted
+    // date DESC, createdAt DESC) shows transactions in the exact spoken
+    // order. transactions[0] (first spoken) gets the highest timestamp
+    // → top of list within its date group.
+    const baseTime = Date.now();
+    for (let i = 0; i < transactions.length; i++) {
+      const t = transactions[i];
+      const _createdAt = new Date(baseTime + (transactions.length - 1 - i) * 1000);
+
+      setProcessingMsg(`Creating transaction ${i + 1} of ${transactions.length}…`);
+
       try {
         await createTransaction({
           type: t.type,
@@ -273,27 +286,36 @@ export function VoiceTransaction({ accounts }) {
           accountId,
           category: t.category,
           isRecurring: false,
+          _createdAt,
         });
         successCount++;
-      } catch {
-        failCount++;
+      } catch (err) {
+        console.error(`[voice] createTransaction[${i}] failed:`, err);
+        errors.push({ index: i, description: t.description || `#${i + 1}`, error: err.message });
       }
     }
+
+    setProcessingMsg("");
 
     if (successCount > 0) {
       toast.success(
         `${successCount} transaction${successCount > 1 ? "s" : ""} created successfully!`
       );
+      if (errors.length > 0) {
+        toast.error(
+          `${errors.length} transaction${errors.length > 1 ? "s" : ""} failed: ${errors
+            .map((e) => e.description)
+            .join(", ")}`
+        );
+      }
       router.push(`/account/${accountId}`);
       return;
     }
 
-    if (failCount > 0) {
-      toast.error(
-        `${failCount} transaction${failCount > 1 ? "s" : ""} failed to create. Please try again.`
-      );
-      setStage(STAGE.REVIEW);
-    }
+    toast.error(
+      `All ${errors.length} transaction${errors.length > 1 ? "s" : ""} failed to create. Please try again.`
+    );
+    setStage(STAGE.REVIEW);
   };
 
   const reset = () => {
@@ -652,7 +674,9 @@ export function VoiceTransaction({ accounts }) {
         {stage === STAGE.CREATING && (
           <div className="flex flex-col items-center gap-4 py-4">
             <Loader2 className="h-10 w-10 animate-spin text-violet-500" />
-            <p className="text-sm font-medium">Creating transactions…</p>
+            <p className="text-sm font-medium">
+              {processingMsg || "Creating transactions…"}
+            </p>
             <p className="text-xs text-muted-foreground">Please wait</p>
           </div>
         )}

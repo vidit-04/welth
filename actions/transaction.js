@@ -142,10 +142,14 @@ export async function createTransaction(data) {
 
     // Create transaction then recalculate balance from source of truth
     const transaction = await db.$transaction(async (tx) => {
+      // _createdAt is a voice-ordering helper — strip before DB insert,
+      // apply as explicit createdAt so spoken order matches display order.
+      const { _createdAt, ...txData } = data;
       const newTransaction = await tx.transaction.create({
         data: {
-          ...data,
+          ...txData,
           userId: user.id,
+          ...(_createdAt ? { createdAt: new Date(_createdAt) } : {}),
           nextRecurringDate:
             data.isRecurring && data.recurringInterval
               ? calculateNextRecurringDate(data.date, data.recurringInterval)

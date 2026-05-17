@@ -127,10 +127,14 @@ Empty result: []`;
   for (const modelName of GEMINI_MODELS) {
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: modelName });
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        generationConfig: { responseMimeType: "application/json" },
+      });
       const result = await model.generateContent(prompt);
       const rawText = result.response.text().trim();
 
+      // JSON mode guarantees valid JSON, but keep cleanup as belt-and-suspenders.
       const cleaned = rawText
         .replace(/^```(?:json)?\s*/i, "")
         .replace(/\s*```\s*$/i, "")
@@ -138,10 +142,10 @@ Empty result: []`;
 
       const start = cleaned.indexOf("[");
       const end = cleaned.lastIndexOf("]");
-      if (start === -1 || end === -1) throw new Error("No JSON array in AI response.");
+      if (start === -1 || end === -1) throw new Error(`No JSON array from ${modelName}.`);
 
       const parsed = JSON.parse(cleaned.slice(start, end + 1));
-      if (!Array.isArray(parsed)) throw new Error("AI response is not an array.");
+      if (!Array.isArray(parsed)) throw new Error(`${modelName} did not return an array.`);
 
       const validated = [];
       for (const t of parsed) {
