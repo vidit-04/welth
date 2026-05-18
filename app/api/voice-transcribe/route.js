@@ -59,29 +59,19 @@ export async function POST(request) {
         `avgNoSpeech=${avgNoSpeech.toFixed(3)} transcript="${transcription.text?.trim()}"`
     );
 
-    // Block 1: unexpected language → very likely hallucination.
-    // Fan/AC noise causes Whisper to hallucinate in random languages
-    // (Russian, Icelandic, etc.) with no_speech_prob=0 (wrongly confident).
-    // Groq verbose_json returns full names ("english") not ISO codes ("en"),
-    // so include both forms.
-    const ALLOWED_LANGS = new Set([
-      "en", "english",
-      "hi", "hindi",
-      "mr", "marathi",
-      "gu", "gujarati",
-      "ta", "tamil",
-      "te", "telugu",
-      "kn", "kannada",
-      "bn", "bengali",
-      "pa", "punjabi",
-      "ur", "urdu",
+    // Whisper sometimes misdetects language for accented/short audio — log
+    // but never block on language alone. The no_speech check below is the
+    // real quality gate.
+    const EXPECTED_LANGS = new Set([
+      "en", "english", "hi", "hindi", "mr", "marathi", "gu", "gujarati",
+      "ta", "tamil", "te", "telugu", "kn", "kannada", "bn", "bengali",
+      "pa", "punjabi", "ur", "urdu",
     ]);
-    if (!ALLOWED_LANGS.has(detectedLang)) {
-      console.log(`[transcribe] BLOCKED — unexpected language "${detectedLang}"`);
-      return NextResponse.json({ transcript: "" });
+    if (!EXPECTED_LANGS.has(detectedLang)) {
+      console.log(`[transcribe] WARN — unexpected language "${detectedLang}", returning transcript anyway`);
     }
 
-    // Block 2: Whisper itself says no speech detected.
+    // Block: Whisper itself says no speech detected.
     if (avgNoSpeech > 0.8) {
       console.log(`[transcribe] BLOCKED — avgNoSpeech=${avgNoSpeech.toFixed(3)}`);
       return NextResponse.json({ transcript: "" });

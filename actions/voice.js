@@ -12,8 +12,6 @@ const GEMINI_MODELS = [
   "gemini-2.0-flash",
   "gemini-1.5-flash",
   "gemini-1.5-flash-latest",
-  "gemini-3.1-flash-lite",
-  "gemini-3-flash",
 ];
 
 function isValidDateString(str) {
@@ -106,11 +104,11 @@ TRANSACTION TYPE:
 - INCOME: received, got, salary, earned, mila, credited, refund
 
 CRITICAL — READ BEFORE RESPONDING:
-1. Extract ONLY transactions EXPLICITLY stated in the TEXT above.
-2. Do NOT invent, assume, guess, or hallucinate any transaction.
-3. Do NOT use anything from these instructions as a transaction template.
+1. Extract ALL transactions found in the TEXT, including those stated implicitly (e.g., "[service] [amount]", "[amount] for [item]").
+2. Do NOT invent amounts or subjects that are NOT present in the TEXT.
+3. Do NOT use service names from these instructions as examples unless they appear in the TEXT.
 4. If the TEXT is empty, ambient noise, or contains no clear financial information → return [].
-5. Every transaction MUST have a clear amount AND a clear subject in the TEXT.
+5. Every transaction MUST have a clear amount AND a clear subject/item visible in the TEXT.
 
 OUTPUT FORMAT:
 Return ONLY a raw JSON array. No markdown. No backticks. No explanation.
@@ -177,9 +175,11 @@ Empty result: []`;
 
       return validated;
     } catch (err) {
+      console.error(`[voice] ${modelName} failed:`, err?.message ?? err);
       lastError = err;
     }
   }
 
+  console.error("[voice] All Gemini models failed. Last error:", lastError?.message);
   throw new Error(`AI extraction failed: ${lastError?.message ?? "Unknown error"}`);
 }
