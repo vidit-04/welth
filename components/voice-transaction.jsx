@@ -268,12 +268,13 @@ export function VoiceTransaction({ accounts }) {
 
     // Assign explicit createdAt offsets so the account table (sorted
     // date DESC, createdAt DESC) shows transactions in the exact spoken
-    // order. transactions[0] (first spoken) gets the highest timestamp
-    // → top of list within its date group.
+    // order. transactions[0] (first spoken) gets baseTime (highest),
+    // later ones get baseTime-1s, -2s, … — all in the past so any
+    // manually created transaction added afterward sorts above them.
     const baseTime = Date.now();
     for (let i = 0; i < transactions.length; i++) {
       const t = transactions[i];
-      const _createdAt = new Date(baseTime + (transactions.length - 1 - i) * 1000);
+      const _createdAt = new Date(baseTime - i * 1000);
 
       setProcessingMsg(`Creating transaction ${i + 1} of ${transactions.length}…`);
 

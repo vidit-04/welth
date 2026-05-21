@@ -113,6 +113,7 @@ CRITICAL — READ BEFORE RESPONDING:
 OUTPUT FORMAT:
 Return ONLY a raw JSON array. No markdown. No backticks. No explanation.
 Start with [ and end with ].
+CRITICAL ORDERING RULE: Return transactions in the EXACT order they appear in the transcript — first mentioned first, last mentioned last. Do NOT reorder them.
 Each object MUST use EXACTLY these five keys — no other key names allowed:
   "amount"      → positive number
   "type"        → "EXPENSE" or "INCOME"
