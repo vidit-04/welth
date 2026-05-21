@@ -266,17 +266,17 @@ export function VoiceTransaction({ accounts }) {
     let successCount = 0;
     const errors = [];
 
-    // Assign explicit createdAt offsets so the account table (sorted
-    // date DESC, createdAt DESC) shows transactions in the exact spoken
-    // order. transactions[0] (first spoken) gets baseTime (highest),
-    // later ones get baseTime-1s, -2s, … — all in the past so any
-    // manually created transaction added afterward sorts above them.
-    const baseTime = Date.now();
-    for (let i = 0; i < transactions.length; i++) {
+    // Create in reverse order: last-spoken first, first-spoken last.
+    // Because each sequential DB insert gets a higher real createdAt,
+    // the first-spoken transaction (created last) ends up with the
+    // highest createdAt and sorts to the top of the table (date DESC,
+    // createdAt DESC). Any manual transaction added afterward sorts
+    // above all of them for the same reason.
+    let progress = 0;
+    for (let i = transactions.length - 1; i >= 0; i--) {
       const t = transactions[i];
-      const _createdAt = new Date(baseTime - i * 1000);
-
-      setProcessingMsg(`Creating transaction ${i + 1} of ${transactions.length}…`);
+      progress++;
+      setProcessingMsg(`Creating transaction ${progress} of ${transactions.length}…`);
 
       try {
         await createTransaction({
@@ -287,7 +287,6 @@ export function VoiceTransaction({ accounts }) {
           accountId,
           category: t.category,
           isRecurring: false,
-          _createdAt,
         });
         successCount++;
       } catch (err) {
