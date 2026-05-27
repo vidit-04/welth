@@ -208,7 +208,11 @@ export function VoiceTransaction({ accounts }) {
       setTranscript(text);
 
       setProcessingMsg("Extracting transactions with AI...");
-      const extracted = await extractVoiceTransactions(text);
+      // Pass local calendar date so the AI prompt uses the correct
+      // "today" / "yesterday" regardless of server timezone (UTC).
+      const d = new Date();
+      const clientToday = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const extracted = await extractVoiceTransactions(text, clientToday);
 
       if (!extracted || extracted.length === 0) {
         toast.error(

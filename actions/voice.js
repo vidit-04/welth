@@ -19,7 +19,7 @@ function isValidDateString(str) {
   return /^\d{4}-\d{2}-\d{2}$/.test(str) && !isNaN(new Date(str).getTime());
 }
 
-export async function extractVoiceTransactions(transcript) {
+export async function extractVoiceTransactions(transcript, clientTodayStr) {
   const { userId } = await auth();
   if (!userId) throw new Error("Unauthorized");
 
@@ -28,8 +28,12 @@ export async function extractVoiceTransactions(transcript) {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
 
-  const today = new Date();
-  const todayStr = format(today, "yyyy-MM-dd");
+  // Prefer the client-supplied date (user's local calendar day) over the
+  // server's UTC date — they diverge for UTC+ users between midnight and
+  // their UTC offset (e.g. IST users 00:00–05:30 are still on the previous
+  // UTC day on the server).
+  const today = clientTodayStr ? new Date(clientTodayStr) : new Date();
+  const todayStr = clientTodayStr ?? format(today, "yyyy-MM-dd");
   const yesterdayStr = format(subDays(today, 1), "yyyy-MM-dd");
 
   const categoryDefs = defaultCategories
