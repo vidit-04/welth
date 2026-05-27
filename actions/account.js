@@ -96,6 +96,28 @@ export async function bulkDeleteTransactions(transactionIds) {
   }
 }
 
+// One-shot repair: recalculates every account's running balances from the
+// beginning of time. Call once after deploying the DATE_TRUNC balance fix
+// to correct any stale balanceAfter values in the DB.
+export async function recalculateAllAccountBalances() {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthorized");
+
+  const user = await db.user.findUnique({ where: { clerkUserId: userId } });
+  if (!user) throw new Error("User not found");
+
+  const accounts = await db.account.findMany({ where: { userId: user.id } });
+
+  for (const account of accounts) {
+    const epoch = new Date(0); // recalculate every transaction ever
+    await recalculateBalancesFromDate(account.id, epoch);
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/account/[id]");
+  return { success: true, accounts: accounts.length };
+}
+
 export async function updateDefaultAccount(accountId) {
   try {
     const { userId } = await auth();
