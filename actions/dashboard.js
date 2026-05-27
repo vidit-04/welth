@@ -149,7 +149,7 @@ export async function getDashboardData() {
   // Get all user transactions
   const transactions = await db.transaction.findMany({
     where: { userId: user.id },
-    orderBy: [{ date: "desc" }, { createdAt: "asc" }],
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
   });
 
   return transactions.map(serializeTransaction);

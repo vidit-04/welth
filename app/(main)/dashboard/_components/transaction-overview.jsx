@@ -47,7 +47,7 @@ export function DashboardOverview({ accounts, transactions }) {
     .sort((a, b) => {
       const dayOf = (d) => { const dt = new Date(d); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime(); };
       const d = dayOf(b.date) - dayOf(a.date);
-      return d !== 0 ? d : new Date(a.createdAt) - new Date(b.createdAt);
+      return d !== 0 ? d : new Date(b.createdAt) - new Date(a.createdAt);
     })
     .slice(0, 5);
 

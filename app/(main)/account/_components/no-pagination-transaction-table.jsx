@@ -105,7 +105,7 @@ export function NoPaginationTransactionTable({ transactions }) {
           const dayOf = (d) => { const dt = new Date(d); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime(); };
           comparison = dayOf(a.date) - dayOf(b.date);
           if (comparison === 0) {
-            return new Date(a.createdAt) - new Date(b.createdAt);
+            return new Date(b.createdAt) - new Date(a.createdAt);
           }
           break;
         }
