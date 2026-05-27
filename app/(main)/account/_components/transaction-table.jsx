@@ -130,7 +130,8 @@ export function TransactionTable({ transactions }) {
         case "date":
           comparison = new Date(a.date) - new Date(b.date);
           if (comparison === 0) {
-            comparison = new Date(a.createdAt) - new Date(b.createdAt);
+            // Always sort ties by createdAt ASC so entry order is preserved
+            return new Date(a.createdAt) - new Date(b.createdAt);
           }
           break;
         case "amount":

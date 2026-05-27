@@ -269,9 +269,7 @@ export async function getUserTransactions(query = {}) {
       include: {
         account: true,
       },
-      orderBy: {
-        date: "desc",
-      },
+      orderBy: [{ date: "desc" }, { createdAt: "asc" }],
     });
 
     return { success: true, data: transactions.map(serializeAmount) };

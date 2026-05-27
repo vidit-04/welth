@@ -103,6 +103,9 @@ export function NoPaginationTransactionTable({ transactions }) {
       switch (sortConfig.field) {
         case "date":
           comparison = new Date(a.date) - new Date(b.date);
+          if (comparison === 0) {
+            return new Date(a.createdAt) - new Date(b.createdAt);
+          }
           break;
         case "amount":
           comparison = a.amount - b.amount;
