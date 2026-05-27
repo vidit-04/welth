@@ -81,6 +81,15 @@ function normalizeReceiptData(parsed) {
   };
 }
 
+// Normalises any date to UTC midnight using the same +12 h shift used in
+// lib/balance.js so that local-midnight dates from UTC+ clients (e.g. IST
+// midnight stored as T18:30Z) are corrected before hitting the DB.
+// This is the server-side safety net; the client form also normalises.
+function toUTCMidnight(d) {
+  const shifted = new Date(new Date(d).getTime() + 12 * 60 * 60 * 1000);
+  return new Date(Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate()));
+}
+
 // Create Transaction
 export async function createTransaction(data) {
   try {
@@ -121,10 +130,13 @@ export async function createTransaction(data) {
       throw new Error("User not found");
     }
 
+    // Normalise to UTC midnight — enforced server-side regardless of client format
+    const txDate = toUTCMidnight(data.date);
+    data = { ...data, date: txDate };
+
     // Reject future-dated transactions
-    const txDate = new Date(data.date);
     const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
+    endOfToday.setUTCHours(23, 59, 59, 999);
     if (txDate > endOfToday) {
       throw new Error("Transaction date cannot be in the future.");
     }
@@ -212,6 +224,9 @@ export async function updateTransaction(id, data) {
     });
 
     if (!originalTransaction) throw new Error("Transaction not found");
+
+    // Normalise date server-side before any writes
+    data = { ...data, date: toUTCMidnight(data.date) };
 
     // Update transaction then recalculate balance(s) from source of truth
     const transaction = await db.$transaction(async (tx) => {
