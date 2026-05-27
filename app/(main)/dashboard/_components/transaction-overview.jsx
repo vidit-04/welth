@@ -45,7 +45,8 @@ export function DashboardOverview({ accounts, transactions }) {
   // Get recent transactions (last 5)
   const recentTransactions = accountTransactions
     .sort((a, b) => {
-      const d = new Date(b.date) - new Date(a.date);
+      const dayOf = (d) => { const dt = new Date(d); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime(); };
+      const d = dayOf(b.date) - dayOf(a.date);
       return d !== 0 ? d : new Date(a.createdAt) - new Date(b.createdAt);
     })
     .slice(0, 5);

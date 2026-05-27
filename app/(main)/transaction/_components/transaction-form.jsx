@@ -32,6 +32,15 @@ import { transactionSchema } from "@/app/lib/schema";
 import { ReceiptScanner } from "./recipt-scanner";
 import { VoiceTransaction } from "@/components/voice-transaction";
 
+// Normalize any Date to UTC midnight of the same local calendar day.
+// Prevents timezone drift: a Calendar click gives local midnight (e.g.
+// 18:30 UTC for IST midnight), while voice uses new Date("YYYY-MM-DD")
+// which is UTC midnight — both must map to the same UTC value.
+const toUTCMidnight = (d) => {
+  const dt = new Date(d);
+  return new Date(Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate()));
+};
+
 export function AddTransactionForm({
   accounts,
   categories,
@@ -60,7 +69,7 @@ export function AddTransactionForm({
             description: initialData.description,
             accountId: initialData.accountId,
             category: initialData.category,
-            date: new Date(initialData.date),
+            date: toUTCMidnight(new Date(initialData.date)),
             isRecurring: initialData.isRecurring,
             ...(initialData.recurringInterval && {
               recurringInterval: initialData.recurringInterval,
@@ -73,7 +82,7 @@ export function AddTransactionForm({
             description: "",
             accountId: accounts.find((ac) => ac.isDefault)?.id,
             category: "",
-            date: new Date(),
+            date: toUTCMidnight(new Date()),
             isRecurring: false,
             reminderEnabled: false,
           },
@@ -101,7 +110,7 @@ export function AddTransactionForm({
   const handleScanComplete = (scannedData) => {
     if (scannedData) {
       setValue("amount", scannedData.amount.toString());
-      setValue("date", new Date(scannedData.date));
+      setValue("date", toUTCMidnight(new Date(scannedData.date)));
       if (scannedData.description) {
         setValue("description", scannedData.description);
       }
@@ -258,7 +267,7 @@ export function AddTransactionForm({
             <Calendar
               mode="single"
               selected={date}
-              onSelect={(date) => setValue("date", date)}
+              onSelect={(date) => setValue("date", date ? toUTCMidnight(date) : date)}
               disabled={(date) =>
                 date > new Date() || date < new Date("1900-01-01")
               }

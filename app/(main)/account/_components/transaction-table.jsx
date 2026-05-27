@@ -127,13 +127,16 @@ export function TransactionTable({ transactions }) {
       let comparison = 0;
 
       switch (sortConfig.field) {
-        case "date":
-          comparison = new Date(a.date) - new Date(b.date);
+        case "date": {
+          // Compare by local calendar day (not raw UTC) so timezone-shifted
+          // dates (e.g. IST midnight stored as UTC-prev-day) group correctly.
+          const dayOf = (d) => { const dt = new Date(d); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime(); };
+          comparison = dayOf(a.date) - dayOf(b.date);
           if (comparison === 0) {
-            // Always sort ties by createdAt ASC so entry order is preserved
             return new Date(a.createdAt) - new Date(b.createdAt);
           }
           break;
+        }
         case "amount":
           comparison = a.amount - b.amount;
           break;

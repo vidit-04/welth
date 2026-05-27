@@ -101,12 +101,14 @@ export function NoPaginationTransactionTable({ transactions }) {
       let comparison = 0;
 
       switch (sortConfig.field) {
-        case "date":
-          comparison = new Date(a.date) - new Date(b.date);
+        case "date": {
+          const dayOf = (d) => { const dt = new Date(d); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime(); };
+          comparison = dayOf(a.date) - dayOf(b.date);
           if (comparison === 0) {
             return new Date(a.createdAt) - new Date(b.createdAt);
           }
           break;
+        }
         case "amount":
           comparison = a.amount - b.amount;
           break;
