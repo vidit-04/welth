@@ -6,6 +6,7 @@ import { TransactionTable } from "../_components/transaction-table";
 import { BudgetProgress } from "../../dashboard/_components/budget-progress";
 import { notFound } from "next/navigation";
 import { AccountChart } from "../_components/account-chart";
+import { RecalculateButton } from "../_components/recalculate-button";
 
 export default async function AccountPage({ params }) {
   const resolvedParams = await params;
@@ -39,6 +40,9 @@ export default async function AccountPage({ params }) {
           <p className="text-xs sm:text-sm text-muted-foreground">
             {account._count.transactions} Transactions
           </p>
+          <div className="mt-2">
+            <RecalculateButton accountId={account.id} />
+          </div>
         </div>
       </div>
 
