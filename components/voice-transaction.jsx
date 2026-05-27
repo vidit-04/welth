@@ -266,17 +266,14 @@ export function VoiceTransaction({ accounts }) {
     let successCount = 0;
     const errors = [];
 
-    // Create in reverse order: last-spoken first, first-spoken last.
-    // Because each sequential DB insert gets a higher real createdAt,
-    // the first-spoken transaction (created last) ends up with the
-    // highest createdAt and sorts to the top of the table (date DESC,
-    // createdAt DESC). Any manual transaction added afterward sorts
-    // above all of them for the same reason.
-    let progress = 0;
-    for (let i = transactions.length - 1; i >= 0; i--) {
+    // Create in spoken order (first to last). The sort is date DESC,
+    // createdAt ASC — so the earliest-inserted record appears first
+    // within a date group. First spoken → created first → appears first.
+    // Manual transactions added later get a higher createdAt and sink
+    // to the bottom of their date group, which is the expected behaviour.
+    for (let i = 0; i < transactions.length; i++) {
       const t = transactions[i];
-      progress++;
-      setProcessingMsg(`Creating transaction ${progress} of ${transactions.length}…`);
+      setProcessingMsg(`Creating transaction ${i + 1} of ${transactions.length}…`);
 
       try {
         await createTransaction({
