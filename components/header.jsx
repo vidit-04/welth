@@ -1,6 +1,6 @@
 import React from "react";
 import { Button } from "./ui/button";
-import { PenBox, LayoutDashboard, CalendarDays } from "lucide-react";
+import { PenBox, LayoutDashboard, CalendarDays, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { SignInButton, UserButton } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
@@ -28,51 +28,46 @@ const Header = async () => {
           />
         </Link>
 
-        {/* Navigation Links - Different for signed in/out users */}
         <div className="hidden md:flex items-center space-x-8">
           {!isSignedIn && (
             <>
-            <a href="#features" className="text-gray-600 hover:text-blue-600">
-              Features
-            </a>
-            <a
-              href="#testimonials"
-              className="text-gray-600 hover:text-blue-600"
-            >
-              Testimonials
-            </a>
+              <a href="#features" className="text-gray-600 hover:text-blue-600">
+                Features
+              </a>
+              <a href="#testimonials" className="text-gray-600 hover:text-blue-600">
+                Testimonials
+              </a>
             </>
           )}
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2">
           {isSignedIn && (
             <>
-            <Link
-              href="/dashboard"
-              className="text-gray-600 hover:text-blue-600 flex items-center gap-2"
-            >
-              <Button variant="outline">
-                <LayoutDashboard size={18} />
-                <span className="hidden md:inline">Dashboard</span>
-              </Button>
-            </Link>
-            <Link
-              href="/calendar"
-              className="text-gray-600 hover:text-blue-600 flex items-center gap-2"
-            >
-              <Button variant="outline">
-                <CalendarDays size={18} />
-                <span className="hidden md:inline">Calendar</span>
-              </Button>
-            </Link>
-            <a href="/transaction/create">
-              <Button className="flex items-center gap-2">
-                <PenBox size={18} />
-                <span className="hidden md:inline">Add Transaction</span>
-              </Button>
-            </a>
+              <Link href="/dashboard" className="text-gray-600 hover:text-blue-600">
+                <Button variant="outline">
+                  <LayoutDashboard size={18} />
+                  <span className="hidden md:inline">Dashboard</span>
+                </Button>
+              </Link>
+              <Link href="/calendar" className="text-gray-600 hover:text-blue-600">
+                <Button variant="outline">
+                  <CalendarDays size={18} />
+                  <span className="hidden md:inline">Calendar</span>
+                </Button>
+              </Link>
+              <Link href="/recurring" className="text-gray-600 hover:text-blue-600">
+                <Button variant="outline">
+                  <RefreshCw size={18} />
+                  <span className="hidden md:inline">Recurring</span>
+                </Button>
+              </Link>
+              <Link href="/transaction/create">
+                <Button className="flex items-center gap-2">
+                  <PenBox size={18} />
+                  <span className="hidden md:inline">Add Transaction</span>
+                </Button>
+              </Link>
             </>
           )}
           {!isSignedIn && (
@@ -83,9 +78,7 @@ const Header = async () => {
           {isSignedIn && (
             <UserButton
               appearance={{
-                elements: {
-                  avatarBox: "w-10 h-10",
-                },
+                elements: { avatarBox: "w-10 h-10" },
               }}
             />
           )}

@@ -10,7 +10,7 @@ import {
   Legend,
 } from "recharts";
 import { format } from "date-fns";
-import { ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight } from "lucide-react";
 
 import {
   Select,
@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const COLORS = [
@@ -37,61 +38,68 @@ export function DashboardOverview({ accounts, transactions }) {
     accounts.find((a) => a.isDefault)?.id || accounts[0]?.id
   );
 
-  // Filter transactions for selected account
+  const now = new Date();
+  const [pieMonth, setPieMonth] = useState(now.getMonth());
+  const [pieYear, setPieYear] = useState(now.getFullYear());
+
+  const isCurrentMonth =
+    pieMonth === now.getMonth() && pieYear === now.getFullYear();
+
+  const goToPrevMonth = () => {
+    if (pieMonth === 0) { setPieMonth(11); setPieYear((y) => y - 1); }
+    else setPieMonth((m) => m - 1);
+  };
+
+  const goToNextMonth = () => {
+    if (isCurrentMonth) return;
+    if (pieMonth === 11) { setPieMonth(0); setPieYear((y) => y + 1); }
+    else setPieMonth((m) => m + 1);
+  };
+
   const accountTransactions = transactions.filter(
     (t) => t.accountId === selectedAccountId
   );
 
-  // Get recent transactions (last 5)
   const recentTransactions = accountTransactions
     .sort((a, b) => {
-      const dayOf = (d) => { const dt = new Date(d); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime(); };
+      const dayOf = (d) => {
+        const dt = new Date(d);
+        return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime();
+      };
       const d = dayOf(b.date) - dayOf(a.date);
       return d !== 0 ? d : new Date(b.createdAt) - new Date(a.createdAt);
     })
     .slice(0, 5);
 
-  // Calculate expense breakdown for current month
-  const currentDate = new Date();
   const currentMonthExpenses = accountTransactions.filter((t) => {
     const transactionDate = new Date(t.date);
     return (
       t.type === "EXPENSE" &&
-      transactionDate.getMonth() === currentDate.getMonth() &&
-      transactionDate.getFullYear() === currentDate.getFullYear()
+      transactionDate.getMonth() === pieMonth &&
+      transactionDate.getFullYear() === pieYear
     );
   });
 
-  // Group expenses by category
   const expensesByCategory = currentMonthExpenses.reduce((acc, transaction) => {
     const category = transaction.category;
-    if (!acc[category]) {
-      acc[category] = 0;
-    }
+    if (!acc[category]) acc[category] = 0;
     acc[category] += transaction.amount;
     return acc;
   }, {});
 
-  // Format data for pie chart
   const pieChartData = Object.entries(expensesByCategory).map(
-    ([category, amount]) => ({
-      name: category,
-      value: amount,
-    })
+    ([category, amount]) => ({ name: category, value: amount })
   );
 
   return (
     <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
-      {/* Recent Transactions Card */}
+      {/* Recent Transactions */}
       <Card className="min-w-0 overflow-hidden">
         <CardHeader className="flex flex-col gap-3 pb-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
           <CardTitle className="text-base font-normal">
             Recent Transactions
           </CardTitle>
-          <Select
-            value={selectedAccountId}
-            onValueChange={setSelectedAccountId}
-          >
+          <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
             <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Select account" />
             </SelectTrigger>
@@ -124,22 +132,20 @@ export function DashboardOverview({ accounts, transactions }) {
                       {format(new Date(transaction.date), "PP")}
                     </p>
                   </div>
-                  <div className="shrink-0">
-                    <div
-                      className={cn(
-                        "flex items-center text-sm sm:text-base",
-                        transaction.type === "EXPENSE"
-                          ? "text-red-500"
-                          : "text-green-500"
-                      )}
-                    >
-                      {transaction.type === "EXPENSE" ? (
-                        <ArrowDownRight className="mr-1 h-4 w-4" />
-                      ) : (
-                        <ArrowUpRight className="mr-1 h-4 w-4" />
-                      )}
-                      ₹{transaction.amount.toFixed(2)}
-                    </div>
+                  <div
+                    className={cn(
+                      "flex shrink-0 items-center text-sm sm:text-base",
+                      transaction.type === "EXPENSE"
+                        ? "text-red-500"
+                        : "text-green-500"
+                    )}
+                  >
+                    {transaction.type === "EXPENSE" ? (
+                      <ArrowDownRight className="mr-1 h-4 w-4" />
+                    ) : (
+                      <ArrowUpRight className="mr-1 h-4 w-4" />
+                    )}
+                    ₹{transaction.amount.toFixed(2)}
                   </div>
                 </div>
               ))
@@ -148,17 +154,39 @@ export function DashboardOverview({ accounts, transactions }) {
         </CardContent>
       </Card>
 
-      {/* Expense Breakdown Card */}
+      {/* Expense Breakdown */}
       <Card className="min-w-0 overflow-hidden">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-base font-normal">
-            Monthly Expense Breakdown
+            Expense Breakdown
           </CardTitle>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={goToPrevMonth}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="w-[80px] text-center text-sm">
+              {format(new Date(pieYear, pieMonth), "MMM yyyy")}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={goToNextMonth}
+              disabled={isCurrentMonth}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="overflow-hidden p-0 pb-5">
           {pieChartData.length === 0 ? (
             <p className="text-center text-muted-foreground py-4">
-              No expenses this month
+              No expenses for {format(new Date(pieYear, pieMonth), "MMMM yyyy")}
             </p>
           ) : (
             <div className="h-[260px] sm:h-[300px]">
